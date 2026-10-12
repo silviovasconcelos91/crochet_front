@@ -49,7 +49,7 @@ export function PatternMenu({ pattern, actions, keepAwake, onKeepAwakeChange, on
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div role="menu" className="absolute right-0 z-50 mt-1 w-64 rounded-xl bg-white p-1 shadow-lg ring-1 ring-stone-200">
-            <Link role="menuitem" to={`/patterns/${pattern.id}/edit`} className={ITEM}>
+            <Link role="menuitem" to={`/patterns/${pattern.id}/edit`} state={{ fromDetail: true }} className={ITEM}>
               Modifier
             </Link>
             {state === 'in-progress' && (

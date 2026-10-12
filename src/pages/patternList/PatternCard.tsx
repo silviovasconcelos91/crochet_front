@@ -10,7 +10,16 @@ function Thumbnail({ src }: { src: string | null }) {
   if (!isHttpUrl(src) || failed) {
     return <div aria-hidden="true" className="grid size-16 shrink-0 place-items-center rounded-xl bg-rose-50 text-2xl">🧶</div>
   }
-  return <img src={src} alt="" loading="lazy" onError={() => setFailed(true)} className="size-16 shrink-0 rounded-xl object-cover" />
+  return (
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+      className="size-16 shrink-0 rounded-xl object-cover"
+    />
+  )
 }
 
 export function PatternCard({ pattern }: { pattern: PatternSummary }) {
@@ -18,7 +27,7 @@ export function PatternCard({ pattern }: { pattern: PatternSummary }) {
     .filter(Boolean)
     .join(' · ')
   return (
-    <Link to={`/patterns/${pattern.id}`} className="flex gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-stone-200 active:bg-stone-50">
+    <Link to={`/patterns/${pattern.id}`} state={{ fromList: true }} className="flex gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-stone-200 active:bg-stone-50">
       <Thumbnail src={pattern.imageUrl} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <h2 className="truncate font-semibold">{pattern.title}</h2>

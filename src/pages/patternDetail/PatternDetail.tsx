@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
-import { useAbandonProgress, useDeletePattern } from '../../api/queries'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router'
+import { queryKeys, useAbandonProgress, useDeletePattern } from '../../api/queries'
 import type { Pattern } from '../../api/types'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useToast } from '../../components/toast/useToast'
@@ -22,10 +23,30 @@ export function PatternDetail({ pattern }: { pattern: Pattern }) {
   const remove = useDeletePattern(pattern.id)
   const toast = useToast()
   const navigate = useNavigate()
+  const location = useLocation()
+  const queryClient = useQueryClient()
   const [confirm, setConfirm] = useState<Confirm>(null)
   const [keepAwake, setKeepAwake] = useKeepAwakePreference()
+  const deleted = useRef(false)
 
   useWakeLock(keepAwake && patternState(pattern.progress) === 'in-progress')
+
+  // Le cache du détail n'est retiré qu'une fois la page quittée : le retirer plus tôt
+  // relancerait une requête (404) pendant la navigation.
+  useEffect(() => {
+    const key = queryKeys.pattern(pattern.id)
+    return () => {
+      if (deleted.current) queryClient.removeQueries({ queryKey: key, exact: true })
+    }
+  }, [queryClient, pattern.id])
+
+  const leaveAfterDelete = () => {
+    deleted.current = true
+    toast.show('Pattern supprimé', 'success')
+    // Arrivé depuis la liste : on y revient sans empiler une seconde entrée d'historique.
+    if ((location.state as { fromList?: boolean } | null)?.fromList) navigate(-1)
+    else navigate('/', { replace: true })
+  }
 
   const onError = (error: unknown) => {
     setConfirm(null)
@@ -71,13 +92,7 @@ export function PatternDetail({ pattern }: { pattern: Pattern }) {
         loading={remove.isPending}
         onCancel={() => setConfirm(null)}
         onConfirm={() =>
-          remove.mutate(undefined, {
-            onSuccess: () => {
-              toast.show('Pattern supprimé', 'success')
-              navigate('/', { replace: true })
-            },
-            onError,
-          })
+          remove.mutate(undefined, { onSuccess: leaveAfterDelete, onError })
         }
       />
     </div>

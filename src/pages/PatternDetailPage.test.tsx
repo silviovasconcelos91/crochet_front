@@ -1,12 +1,16 @@
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { http } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { db, progressAt, seedAccount, seedPattern } from '../test/db'
 import { apiUrl, problem } from '../test/handlers'
 import { renderApp } from '../test/renderApp'
 import { server } from '../test/server'
+import { TAP_GUARD_MS } from './patternDetail/ProgressActions'
 
 const row = (value: string) => screen.getByRole('button', { name: (name) => name.includes(value) })
+
+/** Laisse passer la protection anti double appui de la barre d'action. */
+const pauseAfterTap = () => new Promise((resolve) => setTimeout(resolve, TAP_GUARD_MS + 50))
 
 /** Steps par défaut : Tête [6ms dans cercle (6), 6aug (12)], Corps [12ms (12)]. */
 function setup(overrides: Parameters<typeof seedPattern>[1] = {}) {
@@ -30,13 +34,51 @@ describe('PatternDetailPage', () => {
     await user.click(await screen.findByRole('button', { name: /Rang suivant/ }))
     expect(row('12ms (12)')).toHaveAttribute('aria-current', 'step')
 
+    await pauseAfterTap()
     await user.click(await screen.findByRole('button', { name: /Terminer/ }))
     expect(await screen.findByRole('button', { name: 'Rouvrir' })).toBeInTheDocument()
     await waitFor(() => expect(db.patterns.find((p) => p.id === pattern.id)?.progress?.status).toBe('FINISHED'))
 
+    await pauseAfterTap()
     await user.click(screen.getByRole('button', { name: 'Rouvrir' }))
     expect(await screen.findByRole('button', { name: /Terminer/ })).toBeInTheDocument()
     await waitFor(() => expect(db.patterns.find((p) => p.id === pattern.id)?.progress?.finishedAt).toBeNull())
+  })
+
+  it('ignore un double appui qui tomberait sur « Terminer »', async () => {
+    const { user } = setup({ progress: progressAt(0, 1) })
+    await user.click(await screen.findByRole('button', { name: /Rang suivant/ }))
+    await user.click(screen.getByRole('button', { name: /Terminer/ }))
+    expect(screen.getByRole('button', { name: /Terminer/ })).toBeInTheDocument()
+    await waitFor(() => expect(db.patterns[0].progress).toMatchObject({ stepIndex: 1, rowIndex: 0 }))
+    expect(db.patterns[0].progress?.status).toBe('IN_PROGRESS')
+  })
+
+  it('ignore un double appui qui tomberait sur « Rang suivant » après « Rouvrir »', async () => {
+    const { user } = setup({ progress: progressAt(0, 0, 'FINISHED') })
+    await user.click(await screen.findByRole('button', { name: 'Rouvrir' }))
+    await user.click(screen.getByRole('button', { name: /Rang suivant/ }))
+    expect(row('6ms dans cercle (6)')).toHaveAttribute('aria-current', 'step')
+    await waitFor(() => expect(db.patterns[0].progress?.status).toBe('IN_PROGRESS'))
+    expect(db.patterns[0].progress?.rowIndex).toBe(0)
+  })
+
+  it('masque une image de détail cassée', async () => {
+    setup({ imageUrl: 'https://ex.com/cassee.png' })
+    await screen.findByRole('heading', { name: 'Lapin' })
+    const image = document.querySelector('img')
+    expect(image).not.toBeNull()
+    expect(image).toHaveAttribute('referrerpolicy', 'no-referrer')
+    fireEvent.error(image!)
+    expect(document.querySelector('img')).toBeNull()
+  })
+
+  it('affiche « Pattern introuvable » si le pattern a été supprimé ailleurs', async () => {
+    const { user } = setup({ progress: progressAt(0, 0) })
+    await screen.findByRole('button', { name: /Rang suivant/ })
+    db.patterns = []
+    await user.click(screen.getByRole('button', { name: /Rang suivant/ }))
+    expect(await screen.findByRole('heading', { name: 'Pattern introuvable' })).toBeInTheDocument()
   })
 
   it('désactive Précédent au premier rang et recule ensuite', async () => {

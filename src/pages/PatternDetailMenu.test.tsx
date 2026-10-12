@@ -52,6 +52,19 @@ describe('menu du détail', () => {
     expect(db.patterns).toHaveLength(0)
   })
 
+  it('après suppression depuis la liste, revient en arrière sans doublon d’historique ni cache périmé', async () => {
+    const account = seedAccount()
+    const pattern = seedPattern(account.id)
+    const { user, router, queryClient } = renderApp('/')
+    await user.click(await screen.findByRole('heading', { name: 'Lapin' }))
+    await openMenu(user)
+    await user.click(screen.getByRole('menuitem', { name: 'Supprimer le pattern' }))
+    await user.click(screen.getByRole('button', { name: 'Supprimer' }))
+    expect(await screen.findByRole('heading', { name: 'Mes patterns' })).toBeInTheDocument()
+    expect(router.state.historyAction).toBe('POP')
+    await waitFor(() => expect(queryClient.getQueryData(['patterns', pattern.id])).toBeUndefined())
+  })
+
   it('termine depuis le menu au milieu du pattern', async () => {
     const { user } = setup({ progress: progressAt(0, 0) })
     await openMenu(user)

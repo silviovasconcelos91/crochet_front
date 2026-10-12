@@ -1,16 +1,25 @@
+import { useState } from 'react'
 import type { Pattern } from '../../api/types'
 import { StatusBadge } from '../../components/StatusBadge'
 import { formatHookSize } from '../../lib/format'
 import { isHttpUrl } from '../../lib/url'
 
 export function PatternInfo({ pattern }: { pattern: Pattern }) {
+  // Mémorise l'URL en échec : une nouvelle URL (après édition) retente l'affichage.
+  const [failedImage, setFailedImage] = useState<string | null>(null)
   const meta = [pattern.hookSizeMm !== null ? `Crochet ${formatHookSize(pattern.hookSizeMm)} mm` : null, pattern.yarn]
     .filter(Boolean)
     .join(' · ')
   return (
     <section className="flex flex-col gap-3">
-      {isHttpUrl(pattern.imageUrl) && (
-        <img src={pattern.imageUrl} alt="" className="max-h-64 w-full rounded-2xl object-cover" />
+      {isHttpUrl(pattern.imageUrl) && pattern.imageUrl !== failedImage && (
+        <img
+          src={pattern.imageUrl}
+          alt=""
+          referrerPolicy="no-referrer"
+          onError={() => setFailedImage(pattern.imageUrl)}
+          className="max-h-64 w-full rounded-2xl object-cover"
+        />
       )}
       {meta && <p className="text-stone-600">{meta}</p>}
       {isHttpUrl(pattern.sourceUrl) && (
