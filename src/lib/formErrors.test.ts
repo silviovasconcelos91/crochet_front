@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/client'
-import { applyServerErrors, firstErrorPath, splitFieldErrors, toFormPath } from './formErrors'
+import { applyServerErrors, fieldLabel, firstErrorPath, splitFieldErrors, toFormPath } from './formErrors'
 
 describe('toFormPath', () => {
   it.each([
@@ -63,14 +63,26 @@ describe('applyServerErrors', () => {
       detail: 'Validation failed',
       errors: [
         { field: 'password', message: 'is incorrect' },
-        { field: 'other', message: 'must not be empty' },
+        { field: 'steps', message: 'must not be empty' },
       ],
     }, null)
 
     const banner = applyServerErrors(error, form as never)
 
     expect(form.setError).toHaveBeenCalledWith('password', { type: 'server', message: 'Mot de passe incorrect' })
-    expect(banner).toBe('Ne doit pas être vide')
+    expect(banner).toBe('Étapes : Ne doit pas être vide')
+  })
+
+  it.each([
+    ['steps', 'Étapes'],
+    ['steps[1].rows', 'Rangs de l’étape 2'],
+    ['steps[0].rows[2].value', 'Instructions du rang 3 de l’étape 1'],
+    ['steps[0].rows[2].number', 'Numéro du rang 3 de l’étape 1'],
+    ['steps[3].title', 'Titre de l’étape 4'],
+    ['hookSizeMm', 'Taille du crochet'],
+    ['inconnu', 'inconnu'],
+  ])('fieldLabel(%s) = %s', (field, expected) => {
+    expect(fieldLabel(field)).toBe(expected)
   })
 
   it('renvoie null quand toutes les erreurs ont un champ', () => {

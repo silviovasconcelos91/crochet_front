@@ -48,6 +48,8 @@ describe('translateServerMessage', () => {
     ['must be a well-formed email address', 'Email invalide'],
     ['size must be between 8 and 72', 'Entre 8 et 72 caractères'],
     ['must be less than 3', 'Doit être inférieur à 3'],
+    ['numeric value out of bounds (<2 digits>.<2 digits> expected)', 'Nombre trop grand (99,99 max, 2 décimales)'],
+    ['must be greater than 0', 'Doit être supérieur à 0'],
     ['something else', 'something else'],
   ])('%s', (message, expected) => {
     expect(translateServerMessage(message)).toBe(expected)

@@ -39,6 +39,8 @@ const TRANSLATIONS: [RegExp, string][] = [
   [/^must be a well-formed email address$/, 'Email invalide'],
   [/^size must be between (\d+) and (\d+)$/, 'Entre $1 et $2 caractères'],
   [/^must be less than (\d+)$/, 'Doit être inférieur à $1'],
+  [/^numeric value out of bounds .*$/, 'Nombre trop grand (99,99 max, 2 décimales)'],
+  [/^must be greater than 0$/, 'Doit être supérieur à 0'],
 ]
 
 export function translateServerMessage(message: string): string {

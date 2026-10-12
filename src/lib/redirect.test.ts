@@ -10,6 +10,9 @@ it.each([
   ['/\\evil.example', '/'],
   ['https://evil.example', '/'],
   ['account', '/'],
+  ['/\t/evil.example', '/'],
+  ['/\n/evil.example', '/'],
+  ['/patterns/3#notes', '/patterns/3#notes'],
 ])('safeRedirect(%j) = %j', (value, expected) => {
   expect(safeRedirect(value)).toBe(expected)
 })

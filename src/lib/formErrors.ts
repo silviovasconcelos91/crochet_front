@@ -8,6 +8,28 @@ export function toFormPath(serverPath: string): string {
   return serverPath.replace(/\[(\d+)\]/g, '.$1')
 }
 
+const FIELD_LABELS: [RegExp, (...groups: number[]) => string][] = [
+  [/^steps$/, () => 'Étapes'],
+  [/^steps\[(\d+)\]\.rows$/, (s) => `Rangs de l’étape ${s + 1}`],
+  [/^steps\[(\d+)\]\.title$/, (s) => `Titre de l’étape ${s + 1}`],
+  [/^steps\[(\d+)\]\.rows\[(\d+)\]\.number$/, (s, r) => `Numéro du rang ${r + 1} de l’étape ${s + 1}`],
+  [/^steps\[(\d+)\]\.rows\[(\d+)\]\.value$/, (s, r) => `Instructions du rang ${r + 1} de l’étape ${s + 1}`],
+  [/^title$/, () => 'Titre'],
+  [/^hookSizeMm$/, () => 'Taille du crochet'],
+  [/^yarn$/, () => 'Laine'],
+  [/^sourceUrl$/, () => 'URL source'],
+  [/^imageUrl$/, () => 'URL image'],
+]
+
+/** Libellé lisible d'un champ serveur, pour situer les erreurs affichées dans le bandeau. */
+export function fieldLabel(field: string): string {
+  for (const [pattern, label] of FIELD_LABELS) {
+    const match = pattern.exec(field)
+    if (match) return label(...match.slice(1).map(Number))
+  }
+  return field
+}
+
 function valueAt(source: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((current, key) => {
     if (current === null || typeof current !== 'object') return undefined
@@ -57,5 +79,7 @@ export function applyServerErrors<T extends FieldValues>(error: unknown, form: S
     form.setError(field.path as Path<T>, { type: 'server', message: translateServerMessage(field.message) })
   }
   if (fields.length > 0) scheduleFocusFirstError(form)
-  return others.length > 0 ? others.map((other) => translateServerMessage(other.message)).join(' · ') : null
+  return others.length > 0
+    ? others.map((other) => `${fieldLabel(other.field)} : ${translateServerMessage(other.message)}`).join(' · ')
+    : null
 }
