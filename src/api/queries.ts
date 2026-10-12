@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchCsrf, getMe, login, register } from './auth'
+import { listPatterns } from './patterns'
 
 export const queryKeys = {
   csrf: ['csrf'] as const,
@@ -45,4 +46,8 @@ export function useRegister() {
       queryClient.setQueryData(queryKeys.me, account)
     },
   })
+}
+
+export function usePatterns() {
+  return useQuery({ queryKey: queryKeys.patterns, queryFn: listPatterns })
 }
