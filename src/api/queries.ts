@@ -73,12 +73,13 @@ export function useRegister() {
   })
 }
 
+// Les listes changent aussi par les autres comptes (pattern repassé en privé) : on les recharge au retour dans l'app.
 export function usePublicPatterns() {
-  return useQuery({ queryKey: queryKeys.publicPatterns, queryFn: listPublicPatterns })
+  return useQuery({ queryKey: queryKeys.publicPatterns, queryFn: listPublicPatterns, refetchOnWindowFocus: true })
 }
 
 export function usePatterns() {
-  return useQuery({ queryKey: queryKeys.patterns, queryFn: listPatterns })
+  return useQuery({ queryKey: queryKeys.patterns, queryFn: listPatterns, refetchOnWindowFocus: true })
 }
 
 export function usePattern(id: number | null) {

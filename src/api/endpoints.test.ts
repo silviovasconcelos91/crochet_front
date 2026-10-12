@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db, progressAt, seedAccount, seedPattern, seedProgress } from '../test/db'
-import { changePassword, fetchCsrf, getMe, login, logout, register } from './auth'
+import { changePassword, deleteAccount, fetchCsrf, getMe, login, logout, register } from './auth'
 import { ApiError } from './client'
 import {
   createPattern,
@@ -153,5 +153,16 @@ describe('visibilité et catalogue', () => {
     const created = await createPattern({ title: 'Neuf', steps: mine.steps })
     expect(created.visibility).toBe('PRIVATE')
     expect((await updatePattern(mine.id, { title: mine.title, steps: mine.steps })).visibility).toBe('PRIVATE')
+  })
+})
+
+describe('suppression de compte', () => {
+  it('efface l’avancement du compte supprimé sur les patterns publics des autres', async () => {
+    const bob = seedAccount({ username: 'bob', email: 'bob@example.com', loggedIn: false })
+    const ana = seedAccount()
+    const ours = seedPattern(bob.id, { visibility: 'PUBLIC' })
+    seedProgress(ours, ana.id, progressAt(0, 0))
+    await deleteAccount('secret123')
+    expect(db.patterns[0].otherProgress).toEqual({})
   })
 })

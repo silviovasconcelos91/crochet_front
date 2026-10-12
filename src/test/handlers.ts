@@ -233,6 +233,7 @@ export const handlers = [
       if (body.password !== account.password) return validation([{ field: 'password', message: 'is incorrect' }])
       db.accounts = db.accounts.filter((a) => a.id !== account.id)
       db.patterns = db.patterns.filter((p) => p.ownerId !== account.id)
+      for (const pattern of db.patterns) delete pattern.otherProgress[account.id]
       db.sessionAccountId = null
       return new HttpResponse(null, { status: 204 })
     }),

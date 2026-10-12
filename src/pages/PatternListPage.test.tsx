@@ -1,6 +1,7 @@
+import { focusManager } from '@tanstack/react-query'
 import { screen, waitFor, within } from '@testing-library/react'
 import { http } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { db, progressAt, seedAccount, seedPattern, seedProgress } from '../test/db'
 import { apiUrl, problem } from '../test/handlers'
 import { renderApp } from '../test/renderApp'
@@ -116,4 +117,69 @@ describe('onglets', () => {
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Ours' })).not.toBeInTheDocument())
     expect(db.patterns).toHaveLength(5)
   })
+
+  it('recharge les listes quand on revient dans l’app', async () => {
+    const { ours } = seedCatalogue()
+    renderApp('/')
+    expect(await screen.findByRole('heading', { name: 'Ours' })).toBeInTheDocument()
+    ours.visibility = 'PRIVATE'
+    ours.otherProgress = {}
+    focusManager.setFocused(false)
+    focusManager.setFocused(true)
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Ours' })).not.toBeInTheDocument())
+  })
+
+  it('affiche mes patterns sans attendre le catalogue', async () => {
+    seedCatalogue()
+    server.use(http.get(apiUrl('/api/patterns/public'), () => new Promise<never>(() => {})))
+    renderApp('/')
+    await screen.findAllByRole('listitem')
+    expect(titles()).toEqual(['Abeille', 'Lapin'])
+  })
+
+  it('affiche mes patterns même si le catalogue ne charge pas, avec un bandeau pour réessayer', async () => {
+    seedCatalogue()
+    let fail = true
+    server.use(http.get(apiUrl('/api/patterns/public'), () => (fail ? problem(500, 'boom') : undefined)))
+    const { user } = renderApp('/')
+    // 3 s : une 500 est réessayée une fois, après 1 s.
+    expect(await screen.findByRole('alert', {}, { timeout: 3000 })).toHaveTextContent(
+      'Les patterns publics commencés n’ont pas pu être chargés',
+    )
+    expect(titles()).toEqual(['Abeille', 'Lapin'])
+    fail = false
+    await user.click(screen.getByRole('button', { name: 'Réessayer' }))
+    await waitFor(() => expect(titles()).toEqual(['Abeille', 'Lapin', 'Ours']))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('relie les onglets à leur panneau et se navigue aux flèches', async () => {
+    seedCatalogue()
+    const { user, router } = renderApp('/')
+    const mine = await screen.findByRole('tab', { name: 'Mes patterns' })
+    const catalogue = screen.getByRole('tab', { name: 'Catalogue' })
+    const panel = screen.getByRole('tabpanel', { name: 'Mes patterns' })
+    expect(mine).toHaveAttribute('aria-controls', panel.id)
+    expect(mine).toHaveAttribute('tabindex', '0')
+    expect(catalogue).toHaveAttribute('tabindex', '-1')
+
+    mine.focus()
+    await user.keyboard('{ArrowRight}')
+    expect(catalogue).toHaveFocus()
+    expect(catalogue).toHaveAttribute('aria-selected', 'true')
+    expect(router.state.location.search).toBe('?onglet=catalogue')
+    expect(screen.getByRole('tabpanel', { name: 'Catalogue' })).toBeInTheDocument()
+
+    await user.keyboard('{ArrowRight}')
+    expect(mine).toHaveFocus()
+    await user.keyboard('{End}')
+    expect(catalogue).toHaveFocus()
+    await user.keyboard('{Home}')
+    expect(mine).toHaveFocus()
+    expect(mine).toHaveAttribute('aria-selected', 'true')
+  })
+})
+
+afterEach(() => {
+  focusManager.setFocused(undefined)
 })

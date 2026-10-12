@@ -14,10 +14,10 @@ export function Layout() {
             to="/account"
             aria-label={me ? `Compte (@${me.username})` : 'Compte'}
             className={({ isActive }) =>
-              `grid min-h-11 max-w-[50%] place-items-center truncate rounded-xl px-3 text-sm font-medium ${isActive ? 'bg-rose-50 text-rose-700' : 'text-stone-700'}`
+              `flex min-h-11 max-w-[50%] min-w-0 items-center rounded-xl px-3 text-sm font-medium ${isActive ? 'bg-rose-50 text-rose-700' : 'text-stone-700'}`
             }
           >
-            {me ? `@${me.username}` : 'Compte'}
+            <span className="truncate">{me ? `@${me.username}` : 'Compte'}</span>
           </NavLink>
         </nav>
       </header>

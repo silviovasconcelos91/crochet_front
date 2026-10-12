@@ -20,6 +20,15 @@ describe('pseudo', () => {
     expect(screen.getByText('ana@example.com')).toBeInTheDocument()
   })
 
+  it('tronque un pseudo long avec des points de suspension dans la barre du haut', async () => {
+    seedAccount({ username: 'une_crocheteuse_tres_bavarde' })
+    renderApp('/')
+    const link = await screen.findByRole('link', { name: 'Compte (@une_crocheteuse_tres_bavarde)' })
+    // Un élément de grille ne tronque pas son texte : il faut un enfant `truncate` qui peut rétrécir.
+    expect(within(link).getByText('@une_crocheteuse_tres_bavarde')).toHaveClass('truncate')
+    expect(link).toHaveClass('min-w-0')
+  })
+
   it('change le pseudo et met à jour l’affichage', async () => {
     seedAccount()
     const { user } = renderApp('/account')
