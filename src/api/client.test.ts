@@ -117,6 +117,22 @@ describe('api', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
+  it('ne rejoue pas une 403 qui ne vient pas du CSRF', async () => {
+    fetchMock.mockResolvedValueOnce(json(403, { status: 403, detail: 'Pattern 3 belongs to another account' }))
+    const error = await api('/api/patterns/3', { method: 'PUT', body: {} }).catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 403, problem: { detail: 'Pattern 3 belongs to another account' } })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejoue une 403 sans corps exploitable', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('', { status: 403 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(json(200, { ok: true }))
+    await expect(api('/api/patterns', { method: 'POST', body: {} })).resolves.toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
   it('ne rejoue pas un GET en 403', async () => {
     fetchMock.mockResolvedValueOnce(json(403, { status: 403, detail: 'Access denied' }))
     await api('/api/patterns').catch(() => undefined)

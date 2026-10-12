@@ -9,11 +9,12 @@ describe('errorMessage', () => {
   it.each([
     [apiError(0), 'Serveur injoignable, vérifie ta connexion'],
     [apiError(400, 'Bad Request'), 'Requête invalide'],
-    [apiError(401, 'Invalid email or password'), 'Email ou mot de passe incorrect'],
+    [apiError(401, 'Invalid username or password'), 'Pseudo ou mot de passe incorrect'],
+    [apiError(403, 'Pattern 3 belongs to another account'), 'Ce pattern appartient à un autre compte'],
     [apiError(401, 'Authentication required'), 'Session expirée, reconnecte-toi'],
     [apiError(403, 'Access denied'), 'Session invalide, recharge la page'],
     [apiError(404, 'Pattern 12 not found'), 'Ce pattern est introuvable'],
-    [apiError(409, 'Email already used'), 'Cet email est déjà utilisé'],
+    [apiError(409, 'Already used'), 'Pseudo ou email déjà utilisé'],
     [apiError(500, 'Internal error'), 'Erreur inattendue, réessaie plus tard'],
     [apiError(502), 'Erreur inattendue, réessaie plus tard'],
     [new Error('boom'), 'Erreur inattendue, réessaie plus tard'],
@@ -62,5 +63,17 @@ describe('isNotFound / isNotStarted', () => {
     expect(isNotStarted(apiError(404, 'Pattern 12 is not started'))).toBe(true)
     expect(isNotStarted(apiError(404, 'Pattern 12 not found'))).toBe(false)
     expect(isNotFound(apiError(500))).toBe(false)
+  })
+})
+
+describe('translateServerMessage selon le champ', () => {
+  it.each([
+    ['is already used', 'username', 'Ce pseudo est déjà pris'],
+    ['is already used', 'email', 'Cet email est déjà utilisé'],
+    ['is already used', undefined, 'Déjà utilisé'],
+    ["must be 3 to 30 letters, digits, '_', '-' or '.'", 'username', '3 à 30 caractères : lettres, chiffres, _ - .'],
+    ['must not be blank', 'username', 'Obligatoire'],
+  ])('%s sur %s', (message, field, expected) => {
+    expect(translateServerMessage(message, field)).toBe(expected)
   })
 })

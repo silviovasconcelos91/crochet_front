@@ -33,7 +33,7 @@ export interface ApiOptions {
 
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const response = await send(path, options)
-  if (response.status === 403 && options.method !== undefined && options.method !== 'GET') {
+  if (response.status === 403 && options.method !== undefined && options.method !== 'GET' && (await isCsrfDenial(response))) {
     // Cookie XSRF perdu ou périmé : on en redemande un et on rejoue une seule fois.
     await send('/api/auth/csrf', {})
     return parse<T>(await send(path, options))
@@ -83,4 +83,16 @@ function isProblem(data: unknown): data is Problem {
 function parseRetryAfter(value: string | null): number | null {
   if (value === null || !/^\d+$/.test(value.trim())) return null
   return Number(value.trim())
+}
+
+/** Une 403 CSRF a pour détail « Access denied » (ou pas de corps) ; les autres 403 sont métier. */
+async function isCsrfDenial(response: Response): Promise<boolean> {
+  const text = await response.clone().text().catch(() => '')
+  if (!text) return true
+  try {
+    const data: unknown = JSON.parse(text)
+    return !isProblem(data) || data.detail === 'Access denied'
+  } catch {
+    return true
+  }
 }

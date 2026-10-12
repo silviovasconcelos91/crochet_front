@@ -13,6 +13,16 @@ export const emailRules = {
   },
 }
 
+export const USERNAME_HINT = '3 à 30 caractères : lettres, chiffres, _ - .'
+
+export const usernameRules = {
+  validate: (value: string): true | string => {
+    const username = value.trim()
+    if (username === '') return 'Obligatoire'
+    return /^[\p{L}\p{N}_.-]{3,30}$/u.test(username) || USERNAME_HINT
+  },
+}
+
 export const newPasswordRules = {
   required: 'Obligatoire',
   minLength: { value: 8, message: 'Au moins 8 caractères' },

@@ -85,6 +85,21 @@ describe('applyServerErrors', () => {
     expect(fieldLabel(field)).toBe(expected)
   })
 
+  it('traduit une 409 selon le champ', () => {
+    const form = makeForm({ username: '', email: '' })
+    const error = new ApiError(409, {
+      status: 409,
+      detail: 'Already used',
+      errors: [
+        { field: 'username', message: 'is already used' },
+        { field: 'email', message: 'is already used' },
+      ],
+    }, null)
+    expect(applyServerErrors(error, form as never)).toBeNull()
+    expect(form.setError).toHaveBeenCalledWith('username', { type: 'server', message: 'Ce pseudo est déjà pris' })
+    expect(form.setError).toHaveBeenCalledWith('email', { type: 'server', message: 'Cet email est déjà utilisé' })
+  })
+
   it('renvoie null quand toutes les erreurs ont un champ', () => {
     const form = makeForm({ title: '' })
     const error = new ApiError(400, { errors: [{ field: 'title', message: 'must not be blank' }] }, null)

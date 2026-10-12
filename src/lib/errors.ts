@@ -16,15 +16,17 @@ export function errorMessage(error: unknown): string {
     case 400:
       return 'Requête invalide'
     case 401:
-      return error.problem?.detail === 'Invalid email or password'
-        ? 'Email ou mot de passe incorrect'
+      return error.problem?.detail === 'Invalid username or password'
+        ? 'Pseudo ou mot de passe incorrect'
         : 'Session expirée, reconnecte-toi'
     case 403:
-      return 'Session invalide, recharge la page'
+      return error.problem?.detail?.endsWith('belongs to another account')
+        ? 'Ce pattern appartient à un autre compte'
+        : 'Session invalide, recharge la page'
     case 404:
       return 'Ce pattern est introuvable'
     case 409:
-      return 'Cet email est déjà utilisé'
+      return 'Pseudo ou email déjà utilisé'
     case 429:
       return retryMessage(error.retryAfter)
     default:
@@ -41,9 +43,17 @@ const TRANSLATIONS: [RegExp, string][] = [
   [/^must be less than (\d+)$/, 'Doit être inférieur à $1'],
   [/^numeric value out of bounds .*$/, 'Nombre trop grand (99,99 max, 2 décimales)'],
   [/^must be greater than 0$/, 'Doit être supérieur à 0'],
+  [/^must be 3 to 30 letters, digits, '_', '-' or '\.'$/, '3 à 30 caractères : lettres, chiffres, _ - .'],
 ]
 
-export function translateServerMessage(message: string): string {
+/** Messages dont la traduction dépend du champ concerné. */
+const BY_FIELD: Record<string, Record<string, string>> = {
+  'is already used': { username: 'Ce pseudo est déjà pris', email: 'Cet email est déjà utilisé' },
+}
+
+export function translateServerMessage(message: string, field?: string): string {
+  const byField = BY_FIELD[message]
+  if (byField) return (field !== undefined && byField[field]) || 'Déjà utilisé'
   for (const [pattern, replacement] of TRANSLATIONS) {
     if (pattern.test(message)) return message.replace(pattern, replacement)
   }

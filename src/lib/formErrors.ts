@@ -76,10 +76,10 @@ export function applyServerErrors<T extends FieldValues>(error: unknown, form: S
   if (!(error instanceof ApiError) || error.fieldErrors.length === 0) return errorMessage(error)
   const { fields, others } = splitFieldErrors(error.fieldErrors, form.getValues())
   for (const field of fields) {
-    form.setError(field.path as Path<T>, { type: 'server', message: translateServerMessage(field.message) })
+    form.setError(field.path as Path<T>, { type: 'server', message: translateServerMessage(field.message, field.path) })
   }
   if (fields.length > 0) scheduleFocusFirstError(form)
   return others.length > 0
-    ? others.map((other) => `${fieldLabel(other.field)} : ${translateServerMessage(other.message)}`).join(' · ')
+    ? others.map((other) => `${fieldLabel(other.field)} : ${translateServerMessage(other.message, other.field)}`).join(' · ')
     : null
 }
