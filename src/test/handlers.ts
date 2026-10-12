@@ -1,6 +1,6 @@
 import { http, HttpResponse, type PathParams } from 'msw'
 import { API_URL } from '../api/client'
-import type { ApiFieldError, Pattern, PatternInput, PatternSummary, ProgressInput } from '../api/types'
+import type { ApiFieldError, Pattern, PatternInput, PatternSummary, Progress, ProgressInput } from '../api/types'
 import { db, type DbAccount, type DbPattern } from './db'
 
 export const apiUrl = (path: string) => `${API_URL}${path}`
@@ -37,15 +37,35 @@ const sameUsername = (a: string, b: string) => a.toLowerCase() === b.toLowerCase
 
 const publicAccount = ({ id, username, email, createdAt }: DbAccount) => ({ id, username, email, createdAt })
 
-function publicPattern(pattern: DbPattern): Pattern {
-  const { ownerId: _ownerId, ...rest } = pattern
-  return structuredClone(rest)
+function progressFor(pattern: DbPattern, accountId: number): Progress | null {
+  return accountId === pattern.ownerId ? pattern.progress : (pattern.otherProgress[accountId] ?? null)
 }
 
-function toSummary(pattern: DbPattern): PatternSummary {
-  const { id, title, description, hookSizeMm, yarn, imageUrl, progress } = pattern
-  return { id, title, description, hookSizeMm, yarn, imageUrl, stepCount: pattern.steps.length, progress }
+function setProgressFor(pattern: DbPattern, accountId: number, progress: Progress | null): void {
+  if (accountId === pattern.ownerId) pattern.progress = progress
+  else if (progress) pattern.otherProgress[accountId] = progress
+  else delete pattern.otherProgress[accountId]
 }
+
+/** Vue d'un pattern pour le compte connecté : son avancement, l'auteur, `mine`. */
+function viewOf(pattern: DbPattern, account: DbAccount): Pattern {
+  const { ownerId, otherProgress: _otherProgress, progress: _ownerProgress, ...rest } = pattern
+  const owner = db.accounts.find((a) => a.id === ownerId)
+  return structuredClone({
+    ...rest,
+    progress: progressFor(pattern, account.id),
+    author: { username: owner?.username ?? 'inconnu' },
+    mine: ownerId === account.id,
+  })
+}
+
+function toSummary(pattern: DbPattern, account: DbAccount): PatternSummary {
+  const view = viewOf(pattern, account)
+  const { id, title, description, hookSizeMm, yarn, imageUrl, progress, visibility, author, mine } = view
+  return { id, title, description, hookSizeMm, yarn, imageUrl, stepCount: view.steps.length, progress, visibility, author, mine }
+}
+
+const byTitle = (a: DbPattern, b: DbPattern) => a.title.toLowerCase().localeCompare(b.title.toLowerCase())
 
 type Resolver = (args: { request: Request; params: PathParams; account: DbAccount }) => Response | Promise<Response>
 
@@ -62,15 +82,27 @@ function csrfOnly(resolver: (request: Request) => Response | Promise<Response>) 
   return async ({ request }: { request: Request }) => (csrfOk(request) ? resolver(request) : problem(403, 'Access denied'))
 }
 
-function findOwned(params: PathParams, account: DbAccount): DbPattern | undefined {
+/** Lisible : le mien, ou public. */
+function findVisible(params: PathParams, account: DbAccount): DbPattern | undefined {
   const id = Number(params.id)
-  return db.patterns.find((pattern) => pattern.id === id && pattern.ownerId === account.id)
+  return db.patterns.find((p) => p.id === id && (p.ownerId === account.id || p.visibility === 'PUBLIC'))
 }
 
 const notFound = (params: PathParams) => problem(404, `Pattern ${String(params.id)} not found`)
 
+/** Écriture : 404 si invisible, 403 si visible mais pas à moi. */
+function findWritable(params: PathParams, account: DbAccount): DbPattern | Response {
+  const pattern = findVisible(params, account)
+  if (!pattern) return notFound(params)
+  if (pattern.ownerId !== account.id) return problem(403, `Pattern ${pattern.id} belongs to another account`)
+  return pattern
+}
+
 function validatePatternInput(input: PatternInput): ApiFieldError[] {
   const errors: ApiFieldError[] = []
+  if (input.visibility !== undefined && input.visibility !== 'PRIVATE' && input.visibility !== 'PUBLIC') {
+    errors.push({ field: 'visibility', message: 'must be one of [PRIVATE, PUBLIC]' })
+  }
   if (!input.title?.trim()) errors.push({ field: 'title', message: 'must not be blank' })
   if (!input.steps?.length) errors.push({ field: 'steps', message: 'must not be empty' })
   input.steps?.forEach((step, s) => {
@@ -91,16 +123,23 @@ function applyInput(target: DbPattern, input: PatternInput): void {
   target.yarn = input.yarn ?? null
   target.sourceUrl = input.sourceUrl ?? null
   target.imageUrl = input.imageUrl ?? null
+  // Contrat : omis = PRIVATE, y compris sur PUT. Repasser en privé efface l'avancement des autres.
+  target.visibility = input.visibility ?? 'PRIVATE'
+  if (target.visibility === 'PRIVATE') target.otherProgress = {}
   target.steps = input.steps.map((step) => ({
     title: step.title,
     rows: step.rows.map((row) => ({ number: row.number, value: row.value })),
   }))
   target.updatedAt = new Date().toISOString()
-  if (target.progress) {
-    // Recadrage comme le vrai backend
-    const stepIndex = Math.min(target.progress.stepIndex, target.steps.length - 1)
-    const rowIndex = Math.min(target.progress.rowIndex, target.steps[stepIndex].rows.length - 1)
-    target.progress = { ...target.progress, stepIndex, rowIndex }
+  // Recadrage de chaque avancement, comme le vrai backend
+  const clamp = (progress: Progress): Progress => {
+    const stepIndex = Math.min(progress.stepIndex, target.steps.length - 1)
+    const rowIndex = Math.min(progress.rowIndex, target.steps[stepIndex].rows.length - 1)
+    return { ...progress, stepIndex, rowIndex }
+  }
+  if (target.progress) target.progress = clamp(target.progress)
+  for (const [accountId, progress] of Object.entries(target.otherProgress)) {
+    target.otherProgress[Number(accountId)] = clamp(progress)
   }
 }
 
@@ -185,20 +224,23 @@ export const handlers = [
   http.get(
     apiUrl('/api/patterns'),
     authed(({ account }) =>
-      HttpResponse.json(
-        db.patterns
-          .filter((p) => p.ownerId === account.id)
-          .sort((a, b) => a.title.toLowerCase().localeCompare(b.title.toLowerCase()))
-          .map(toSummary),
-      ),
+      HttpResponse.json(db.patterns.filter((p) => p.ownerId === account.id).sort(byTitle).map((p) => toSummary(p, account))),
+    ),
+  ),
+
+  // Déclaré avant /api/patterns/:id, sinon « public » serait pris pour un id.
+  http.get(
+    apiUrl('/api/patterns/public'),
+    authed(({ account }) =>
+      HttpResponse.json(db.patterns.filter((p) => p.visibility === 'PUBLIC').sort(byTitle).map((p) => toSummary(p, account))),
     ),
   ),
 
   http.get(
     apiUrl('/api/patterns/:id'),
     authed(({ params, account }) => {
-      const pattern = findOwned(params, account)
-      return pattern ? HttpResponse.json(publicPattern(pattern)) : notFound(params)
+      const pattern = findVisible(params, account)
+      return pattern ? HttpResponse.json(viewOf(pattern, account)) : notFound(params)
     }),
   ),
 
@@ -212,12 +254,14 @@ export const handlers = [
       const pattern: DbPattern = {
         id: db.nextId++,
         ownerId: account.id,
+        otherProgress: {},
         title: '',
         description: null,
         hookSizeMm: null,
         yarn: null,
         sourceUrl: null,
         imageUrl: null,
+        visibility: 'PRIVATE',
         createdAt: now,
         updatedAt: now,
         steps: [],
@@ -225,7 +269,7 @@ export const handlers = [
       }
       applyInput(pattern, input)
       db.patterns.push(pattern)
-      return HttpResponse.json(publicPattern(pattern), {
+      return HttpResponse.json(viewOf(pattern, account), {
         status: 201,
         headers: { Location: `/api/patterns/${pattern.id}` },
       })
@@ -235,21 +279,21 @@ export const handlers = [
   http.put(
     apiUrl('/api/patterns/:id'),
     authed(async ({ request, params, account }) => {
-      const pattern = findOwned(params, account)
-      if (!pattern) return notFound(params)
+      const pattern = findWritable(params, account)
+      if (pattern instanceof Response) return pattern
       const input = (await request.json()) as PatternInput
       const errors = validatePatternInput(input)
       if (errors.length > 0) return validation(errors)
       applyInput(pattern, input)
-      return HttpResponse.json(publicPattern(pattern))
+      return HttpResponse.json(viewOf(pattern, account))
     }),
   ),
 
   http.delete(
     apiUrl('/api/patterns/:id'),
     authed(({ params, account }) => {
-      const pattern = findOwned(params, account)
-      if (!pattern) return notFound(params)
+      const pattern = findWritable(params, account)
+      if (pattern instanceof Response) return pattern
       db.patterns = db.patterns.filter((p) => p !== pattern)
       return new HttpResponse(null, { status: 204 })
     }),
@@ -258,7 +302,7 @@ export const handlers = [
   http.put(
     apiUrl('/api/patterns/:id/progress'),
     authed(async ({ request, params, account }) => {
-      const pattern = findOwned(params, account)
+      const pattern = findVisible(params, account)
       if (!pattern) return notFound(params)
       const input = (await request.json()) as ProgressInput
       if (input.status !== 'IN_PROGRESS' && input.status !== 'FINISHED') {
@@ -272,8 +316,8 @@ export const handlers = [
         return validation([{ field: 'rowIndex', message: `must be less than ${rowCount}` }])
       }
       const now = new Date().toISOString()
-      const previous = pattern.progress
-      pattern.progress = {
+      const previous = progressFor(pattern, account.id)
+      const progress: Progress = {
         status: input.status,
         stepIndex: input.stepIndex,
         rowIndex: input.rowIndex,
@@ -281,17 +325,18 @@ export const handlers = [
         updatedAt: now,
         finishedAt: input.status === 'FINISHED' ? (previous?.finishedAt ?? now) : null,
       }
-      return HttpResponse.json(pattern.progress)
+      setProgressFor(pattern, account.id, progress)
+      return HttpResponse.json(progress)
     }),
   ),
 
   http.delete(
     apiUrl('/api/patterns/:id/progress'),
     authed(({ params, account }) => {
-      const pattern = findOwned(params, account)
+      const pattern = findVisible(params, account)
       if (!pattern) return notFound(params)
-      if (!pattern.progress) return problem(404, `Pattern ${pattern.id} is not started`)
-      pattern.progress = null
+      if (!progressFor(pattern, account.id)) return problem(404, `Pattern ${pattern.id} is not started`)
+      setProgressFor(pattern, account.id, null)
       return new HttpResponse(null, { status: 204 })
     }),
   ),

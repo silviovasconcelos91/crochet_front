@@ -3,6 +3,8 @@ import type { Pattern, PatternInput, PatternSummary, Progress, ProgressInput } f
 
 export const listPatterns = () => api<PatternSummary[]>('/api/patterns')
 
+export const listPublicPatterns = () => api<PatternSummary[]>('/api/patterns/public')
+
 export const getPattern = (id: number) => api<Pattern>(`/api/patterns/${id}`)
 
 export const createPattern = (input: PatternInput) => api<Pattern>('/api/patterns', { method: 'POST', body: input })

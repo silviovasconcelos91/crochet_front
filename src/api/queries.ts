@@ -1,16 +1,34 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { changePassword, deleteAccount, fetchCsrf, getMe, login, logout, register } from './auth'
 import { isNotStarted } from '../lib/errors'
 import { optimisticProgress } from '../lib/progress'
-import { createPattern, deletePattern, deleteProgress, getPattern, listPatterns, putProgress, updatePattern } from './patterns'
+import {
+  createPattern,
+  deletePattern,
+  deleteProgress,
+  getPattern,
+  listPatterns,
+  listPublicPatterns,
+  putProgress,
+  updatePattern,
+} from './patterns'
 import type { Pattern, PatternInput, PatternSummary, ProgressInput } from './types'
 
 export const queryKeys = {
   csrf: ['csrf'] as const,
   me: ['me'] as const,
   patterns: ['patterns'] as const,
+  publicPatterns: ['patterns', 'public'] as const,
   pattern: (id: number) => ['patterns', id] as const,
+}
+
+/** Les deux listes (mes patterns, catalogue) dépendent de toute écriture. */
+function invalidateLists(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.publicPatterns, exact: true }),
+  ])
 }
 
 export function useCsrf() {
@@ -50,6 +68,10 @@ export function useRegister() {
       queryClient.setQueryData(queryKeys.me, account)
     },
   })
+}
+
+export function usePublicPatterns() {
+  return useQuery({ queryKey: queryKeys.publicPatterns, queryFn: listPublicPatterns })
 }
 
 export function usePatterns() {
@@ -98,7 +120,7 @@ export function useUpdateProgress(patternId: number, options: { onError?: (error
       if (queryClient.isMutating({ mutationKey }) <= 1) {
         await queryClient.invalidateQueries({ queryKey: key, exact: true })
       }
-      await queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true })
+      await invalidateLists(queryClient)
     },
   })
 }
@@ -121,7 +143,7 @@ export function useAbandonProgress(patternId: number) {
     },
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.pattern(patternId), exact: true })
-      await queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true })
+      await invalidateLists(queryClient)
     },
   })
 }
@@ -132,7 +154,8 @@ export function useDeletePattern(patternId: number) {
     mutationFn: () => deletePattern(patternId),
     onSuccess: () => {
       queryClient.setQueryData<PatternSummary[]>(queryKeys.patterns, (list) => list?.filter((p) => p.id !== patternId))
-      void queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true })
+      queryClient.setQueryData<PatternSummary[]>(queryKeys.publicPatterns, (list) => list?.filter((p) => p.id !== patternId))
+      void invalidateLists(queryClient)
     },
   })
 }
@@ -143,7 +166,7 @@ export function useSavePattern(patternId?: number) {
     mutationFn: (input: PatternInput) => (patternId === undefined ? createPattern(input) : updatePattern(patternId, input)),
     onSuccess: (pattern) => {
       queryClient.setQueryData(queryKeys.pattern(pattern.id), pattern)
-      void queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true })
+      void invalidateLists(queryClient)
     },
   })
 }

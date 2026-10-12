@@ -1,5 +1,11 @@
 export type ProgressStatus = 'IN_PROGRESS' | 'FINISHED'
 
+export type Visibility = 'PRIVATE' | 'PUBLIC'
+
+export interface Author {
+  username: string
+}
+
 export interface Account {
   id: number
   username: string
@@ -41,6 +47,10 @@ export interface Pattern {
   updatedAt: string
   steps: Step[]
   progress: Progress | null
+  visibility: Visibility
+  author: Author
+  /** Je suis l'auteur : édition et suppression possibles. */
+  mine: boolean
 }
 
 export interface PatternSummary {
@@ -52,6 +62,10 @@ export interface PatternSummary {
   imageUrl: string | null
   stepCount: number
   progress: Progress | null
+  visibility: Visibility
+  author: Author
+  /** Je suis l'auteur : édition et suppression possibles. */
+  mine: boolean
 }
 
 export interface PatternInput {
@@ -61,6 +75,7 @@ export interface PatternInput {
   yarn?: string | null
   sourceUrl?: string | null
   imageUrl?: string | null
+  visibility?: Visibility
   steps: { title: string; rows: { number: string; value: string }[] }[]
 }
 

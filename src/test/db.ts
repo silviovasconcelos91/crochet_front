@@ -4,8 +4,10 @@ export interface DbAccount extends Account {
   password: string
 }
 
-export interface DbPattern extends Pattern {
+/** `progress` est l'avancement de l'auteur ; celui des autres comptes est dans `otherProgress`. */
+export interface DbPattern extends Omit<Pattern, 'author' | 'mine'> {
   ownerId: number
+  otherProgress: Record<number, Progress>
 }
 
 interface Db {
@@ -40,16 +42,21 @@ export function seedAccount({
   return account
 }
 
-export function seedPattern(ownerId: number, overrides: Partial<Omit<DbPattern, 'id' | 'ownerId'>> = {}): DbPattern {
+export function seedPattern(
+  ownerId: number,
+  overrides: Partial<Omit<DbPattern, 'id' | 'ownerId' | 'otherProgress'>> = {},
+): DbPattern {
   const pattern: DbPattern = {
     id: db.nextId++,
     ownerId,
+    otherProgress: {},
     title: 'Lapin',
     description: null,
     hookSizeMm: null,
     yarn: null,
     sourceUrl: null,
     imageUrl: null,
+    visibility: 'PRIVATE',
     createdAt: SEED_DATE,
     updatedAt: SEED_DATE,
     steps: [
@@ -61,6 +68,12 @@ export function seedPattern(ownerId: number, overrides: Partial<Omit<DbPattern, 
   }
   db.patterns.push(pattern)
   return pattern
+}
+
+/** Avancement d'un compte donné (l'auteur ou un autre) sur un pattern. */
+export function seedProgress(pattern: DbPattern, accountId: number, progress: Progress): void {
+  if (accountId === pattern.ownerId) pattern.progress = progress
+  else pattern.otherProgress[accountId] = progress
 }
 
 export function progressAt(stepIndex: number, rowIndex: number, status: ProgressStatus = 'IN_PROGRESS'): Progress {

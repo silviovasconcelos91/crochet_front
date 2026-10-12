@@ -24,7 +24,7 @@ describe('formModel', () => {
   it('pré-remplit depuis un pattern (null → "", point → virgule)', () => {
     const pattern = {
       id: 1, title: 'Lapin', description: null, hookSizeMm: 3.5, yarn: 'Coton', sourceUrl: null, imageUrl: null,
-      createdAt: '', updatedAt: '', progress: null,
+      createdAt: '', updatedAt: '', progress: null, visibility: 'PUBLIC', author: { username: 'ana' }, mine: true,
       steps: [{ title: 'Tête', rows: [{ number: '1', value: '6ms' }] }],
     } satisfies Pattern
     expect(toFormValues(pattern)).toMatchObject({ description: '', hookSizeMm: '3,5', yarn: 'Coton', sourceUrl: '' })
