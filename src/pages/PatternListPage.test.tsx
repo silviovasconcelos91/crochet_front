@@ -1,7 +1,7 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { http } from 'msw'
 import { describe, expect, it } from 'vitest'
-import { progressAt, seedAccount, seedPattern } from '../test/db'
+import { db, progressAt, seedAccount, seedPattern, seedProgress } from '../test/db'
 import { apiUrl, problem } from '../test/handlers'
 import { renderApp } from '../test/renderApp'
 import { server } from '../test/server'
@@ -55,5 +55,65 @@ describe('PatternListPage', () => {
     seedAccount()
     renderApp('/')
     expect(await screen.findByRole('link', { name: 'Nouveau pattern' })).toHaveAttribute('href', '/patterns/new')
+  })
+})
+
+describe('onglets', () => {
+  function seedCatalogue() {
+    const bob = seedAccount({ username: 'bob', email: 'bob@example.com', loggedIn: false })
+    const ana = seedAccount()
+    seedPattern(ana.id, { title: 'Abeille', visibility: 'PUBLIC' })
+    seedPattern(ana.id, { title: 'Lapin' })
+    const ours = seedPattern(bob.id, { title: 'Ours', visibility: 'PUBLIC' })
+    seedPattern(bob.id, { title: 'Chat', visibility: 'PUBLIC' })
+    seedPattern(bob.id, { title: 'Secret' })
+    seedProgress(ours, ana.id, progressAt(0, 1))
+    return { ana, bob, ours }
+  }
+
+  const titles = () => screen.getAllByRole('listitem').map((item) => within(item).getByRole('heading').textContent)
+
+  it('Mes patterns inclut les patterns publics des autres que j’ai commencés', async () => {
+    seedCatalogue()
+    renderApp('/')
+    await screen.findAllByRole('listitem')
+    expect(titles()).toEqual(['Abeille', 'Lapin', 'Ours'])
+    expect(screen.getByText('par bob')).toBeInTheDocument()
+    expect(screen.getByText('Public')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Mes patterns' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('le catalogue liste tous les patterns publics, et l’onglet est dans l’URL', async () => {
+    seedCatalogue()
+    const { user, router } = renderApp('/')
+    await user.click(await screen.findByRole('tab', { name: 'Catalogue' }))
+    await waitFor(() => expect(titles()).toEqual(['Abeille', 'Chat', 'Ours']))
+    expect(router.state.location.search).toBe('?onglet=catalogue')
+    expect(router.state.historyAction).toBe('REPLACE')
+    expect(screen.queryByRole('link', { name: 'Nouveau pattern' })).not.toBeInTheDocument()
+  })
+
+  it('ouvre directement le catalogue depuis l’URL', async () => {
+    seedCatalogue()
+    renderApp('/?onglet=catalogue')
+    expect(await screen.findByRole('tab', { name: 'Catalogue' })).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByRole('heading', { name: 'Chat' })).toBeInTheDocument()
+  })
+
+  it('affiche un état vide dans le catalogue', async () => {
+    seedAccount()
+    renderApp('/?onglet=catalogue')
+    expect(await screen.findByText('Aucun pattern public pour l’instant.')).toBeInTheDocument()
+  })
+
+  it('retire un pattern repassé en privé par son auteur au rechargement', async () => {
+    const { ours } = seedCatalogue()
+    const { queryClient } = renderApp('/')
+    expect(await screen.findByRole('heading', { name: 'Ours' })).toBeInTheDocument()
+    ours.visibility = 'PRIVATE'
+    ours.otherProgress = {}
+    await queryClient.invalidateQueries()
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Ours' })).not.toBeInTheDocument())
+    expect(db.patterns).toHaveLength(5)
   })
 })

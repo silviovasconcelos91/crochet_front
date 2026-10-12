@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import type { PatternSummary } from '../../api/types'
 import { StatusBadge } from '../../components/StatusBadge'
+import { VisibilityBadge } from '../../components/VisibilityBadge'
 import { formatHookSize } from '../../lib/format'
 import { isHttpUrl } from '../../lib/url'
 
@@ -31,9 +32,11 @@ export function PatternCard({ pattern }: { pattern: PatternSummary }) {
       <Thumbnail src={pattern.imageUrl} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <h2 className="truncate font-semibold">{pattern.title}</h2>
+        {!pattern.mine && <p className="truncate text-sm text-stone-500">par {pattern.author.username}</p>}
         {meta && <p className="truncate text-sm text-stone-500">{meta}</p>}
-        <div>
+        <div className="flex flex-wrap gap-1">
           <StatusBadge progress={pattern.progress} stepCount={pattern.stepCount} />
+          {pattern.mine && pattern.visibility === 'PUBLIC' && <VisibilityBadge visibility="PUBLIC" />}
         </div>
       </div>
     </Link>
