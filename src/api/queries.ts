@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchCsrf, getMe, login, register } from './auth'
+import { isNotStarted } from '../lib/errors'
 import { optimisticProgress } from '../lib/progress'
-import { getPattern, listPatterns, putProgress } from './patterns'
-import type { Pattern, ProgressInput } from './types'
+import { deletePattern, deleteProgress, getPattern, listPatterns, putProgress } from './patterns'
+import type { Pattern, PatternSummary, ProgressInput } from './types'
 
 export const queryKeys = {
   csrf: ['csrf'] as const,
@@ -91,5 +92,39 @@ export function useUpdateProgress(patternId: number, options: { onError?: (error
       }
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true }),
+  })
+}
+
+export function useAbandonProgress(patternId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      try {
+        await deleteProgress(patternId)
+      } catch (error) {
+        // Déjà non commencé (abandon depuis un autre appareil) : c'est le résultat voulu.
+        if (!isNotStarted(error)) throw error
+      }
+    },
+    onSuccess: () => {
+      queryClient.setQueryData<Pattern>(queryKeys.pattern(patternId), (pattern) =>
+        pattern ? { ...pattern, progress: null } : pattern,
+      )
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.pattern(patternId), exact: true })
+      await queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true })
+    },
+  })
+}
+
+export function useDeletePattern(patternId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => deletePattern(patternId),
+    onSuccess: () => {
+      queryClient.setQueryData<PatternSummary[]>(queryKeys.patterns, (list) => list?.filter((p) => p.id !== patternId))
+      void queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true })
+    },
   })
 }
