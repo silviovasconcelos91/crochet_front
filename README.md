@@ -1,32 +1,31 @@
-# React + TypeScript + Vite
+# crochet_front
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Front React de suivi de patterns de crochet, pour l'API `crochet_back` (voir `doc/front-api.md`).
 
-Currently, two official plugins are available:
+## Démarrer
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+cp .env.example .env.local   # VITE_API_URL, par défaut http://localhost:8080
+npm run dev                  # http://localhost:5173 (origine autorisée par le CORS du backend)
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Le backend doit tourner sur `http://localhost:8080`. En production, le front doit partager le domaine parent de l'API (cookie de session `SameSite=Lax`).
+
+## Scripts
+
+| Commande | Rôle |
+|---|---|
+| `npm run dev` | serveur de dev |
+| `npm run build` | vérification TypeScript + build |
+| `npm run lint` | oxlint |
+| `npm test` | tests (Vitest + Testing Library + MSW) |
+
+## Structure
+
+- `src/api/` : client HTTP (session cookie + CSRF), endpoints, hooks TanStack Query
+- `src/lib/` : logique pure (navigation dans les rangs, erreurs, validation)
+- `src/pages/` : écrans ; `src/components/` : UI partagée
+- `src/test/` : faux backend MSW en mémoire utilisé par les tests
+
+Design : `docs/superpowers/specs/2026-10-12-crochet-front-design.md`.
