@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { fetchCsrf, getMe, login, register } from './auth'
+import { changePassword, deleteAccount, fetchCsrf, getMe, login, logout, register } from './auth'
 import { isNotStarted } from '../lib/errors'
 import { optimisticProgress } from '../lib/progress'
 import { createPattern, deletePattern, deleteProgress, getPattern, listPatterns, putProgress, updatePattern } from './patterns'
@@ -138,4 +138,23 @@ export function useSavePattern(patternId?: number) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true })
     },
   })
+}
+
+function clearSession(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.removeQueries({ queryKey: queryKeys.patterns })
+  queryClient.setQueryData(queryKeys.me, null)
+}
+
+export function useLogout() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: logout, onSuccess: () => clearSession(queryClient) })
+}
+
+export function useChangePassword() {
+  return useMutation({ mutationFn: changePassword })
+}
+
+export function useDeleteAccount() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: deleteAccount, onSuccess: () => clearSession(queryClient) })
 }
