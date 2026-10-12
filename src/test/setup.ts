@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll } from 'vitest'
+import { resetDb } from './db'
 import { server } from './server'
 
 // jsdom n'implémente pas scrollIntoView
@@ -19,6 +20,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => {
   server.resetHandlers()
   cleanup()
+  resetDb()
   clearCookies()
   localStorage.clear()
 })
