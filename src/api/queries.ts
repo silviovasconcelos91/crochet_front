@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchCsrf, getMe, login, register } from './auth'
 import { isNotStarted } from '../lib/errors'
 import { optimisticProgress } from '../lib/progress'
-import { deletePattern, deleteProgress, getPattern, listPatterns, putProgress } from './patterns'
-import type { Pattern, PatternSummary, ProgressInput } from './types'
+import { createPattern, deletePattern, deleteProgress, getPattern, listPatterns, putProgress, updatePattern } from './patterns'
+import type { Pattern, PatternInput, PatternSummary, ProgressInput } from './types'
 
 export const queryKeys = {
   csrf: ['csrf'] as const,
@@ -124,6 +124,17 @@ export function useDeletePattern(patternId: number) {
     mutationFn: () => deletePattern(patternId),
     onSuccess: () => {
       queryClient.setQueryData<PatternSummary[]>(queryKeys.patterns, (list) => list?.filter((p) => p.id !== patternId))
+      void queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true })
+    },
+  })
+}
+
+export function useSavePattern(patternId?: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: PatternInput) => (patternId === undefined ? createPattern(input) : updatePattern(patternId, input)),
+    onSuccess: (pattern) => {
+      queryClient.setQueryData(queryKeys.pattern(pattern.id), pattern)
       void queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true })
     },
   })
