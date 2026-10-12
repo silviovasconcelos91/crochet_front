@@ -91,7 +91,14 @@ export function useUpdateProgress(patternId: number, options: { onError?: (error
         queryClient.setQueryData<Pattern>(key, (pattern) => (pattern ? { ...pattern, progress } : pattern))
       }
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true }),
+    onSettled: async () => {
+      // Dernière mutation de la file : on relit le serveur, seule source de vérité
+      // (échecs en cascade, pattern modifié depuis un autre appareil).
+      if (queryClient.isMutating({ mutationKey }) <= 1) {
+        await queryClient.invalidateQueries({ queryKey: key, exact: true })
+      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.patterns, exact: true })
+    },
   })
 }
 

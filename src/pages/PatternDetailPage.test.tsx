@@ -72,6 +72,42 @@ describe('PatternDetailPage', () => {
     expect(row('6ms dans cercle (6)')).toHaveAttribute('aria-current', 'step')
   })
 
+  it('se resynchronise avec le serveur si deux appuis en file échouent', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const account = seedAccount()
+    const pattern = seedPattern(account.id, {
+      steps: [{ title: 'Unique', rows: [{ number: '1', value: 'A1' }, { number: '2', value: 'A2' }, { number: '3', value: 'A3' }] }],
+      progress: progressAt(0, 0),
+    })
+    server.use(http.put(apiUrl(`/api/patterns/${pattern.id}/progress`), async () => {
+      await gate
+      return problem(500, 'Internal error')
+    }))
+    const { user } = renderApp(`/patterns/${pattern.id}`)
+    await user.click(await screen.findByRole('button', { name: /Rang suivant/ }))
+    await user.click(screen.getByRole('button', { name: /Terminer|Rang suivant/ }))
+    release()
+    await waitFor(() => expect(screen.getAllByRole('alert')).toHaveLength(2))
+    await waitFor(() => expect(row('A1')).toHaveAttribute('aria-current', 'step'))
+    expect(db.patterns[0].progress?.rowIndex).toBe(0)
+  })
+
+  it('se resynchronise après une 400 si le pattern a changé ailleurs', async () => {
+    const { user, pattern } = setup({ progress: progressAt(0, 0) })
+    await screen.findByRole('button', { name: /Rang suivant/ })
+    // Raccourci depuis un autre appareil : l'étape 1 n'a plus qu'un rang.
+    db.patterns[0].steps = [{ title: 'Tête', rows: [{ number: '1', value: '6ms dans cercle (6)' }] }]
+    server.use(http.put(apiUrl(`/api/patterns/${pattern.id}/progress`), () =>
+      problem(400, 'Validation failed', { errors: [{ field: 'rowIndex', message: 'must be less than 1' }] }),
+    ))
+    await user.click(screen.getByRole('button', { name: /Rang suivant/ }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: (name) => name.includes('6aug (12)') })).not.toBeInTheDocument())
+    expect(row('6ms dans cercle (6)')).toHaveAttribute('aria-current', 'step')
+  })
+
   it('encaisse un double appui rapide', async () => {
     const account = seedAccount()
     const pattern = seedPattern(account.id, {
