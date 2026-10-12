@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { fetchCsrf, getMe } from './auth'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { fetchCsrf, getMe, login, register } from './auth'
 
 export const queryKeys = {
   csrf: ['csrf'] as const,
@@ -22,4 +22,27 @@ export function useCsrf() {
 
 export function useMe(enabled = true) {
   return useQuery({ queryKey: queryKeys.me, queryFn: getMe, staleTime: Infinity, enabled })
+}
+
+export function useLogin() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: login,
+    meta: { skipAuthRedirect: true },
+    onSuccess: (account) => {
+      queryClient.removeQueries({ queryKey: queryKeys.patterns })
+      queryClient.setQueryData(queryKeys.me, account)
+    },
+  })
+}
+
+export function useRegister() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: register,
+    onSuccess: (account) => {
+      queryClient.removeQueries({ queryKey: queryKeys.patterns })
+      queryClient.setQueryData(queryKeys.me, account)
+    },
+  })
 }
