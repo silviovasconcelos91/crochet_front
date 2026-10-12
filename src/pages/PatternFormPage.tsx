@@ -1,4 +1,4 @@
-import { useParams } from 'react-router'
+import { Link, useParams } from 'react-router'
 import { usePattern } from '../api/queries'
 import { ErrorState } from '../components/ErrorState'
 import { PatternNotFound } from '../components/PatternNotFound'
@@ -29,5 +29,17 @@ function EditPattern({ rawId }: { rawId: string }) {
   if (query.isError) {
     return isNotFound(query.error) ? <PatternNotFound /> : <ErrorState error={query.error} onRetry={() => void query.refetch()} />
   }
+  if (!query.data.mine) return <NotAuthor patternId={query.data.id} />
   return <PatternForm key={query.data.id} pattern={query.data} />
+}
+
+function NotAuthor({ patternId }: { patternId: number }) {
+  return (
+    <div className="flex flex-col items-center gap-4 py-16 text-center">
+      <h1 className="text-xl font-semibold">Seul l’auteur peut modifier ce pattern</h1>
+      <Link to={`/patterns/${patternId}`} className="font-medium text-rose-700 underline">
+        Retour au pattern
+      </Link>
+    </div>
+  )
 }

@@ -1,4 +1,4 @@
-import type { Pattern, PatternInput } from '../../api/types'
+import type { Pattern, PatternInput, Visibility } from '../../api/types'
 
 export interface RowValues {
   number: string
@@ -17,6 +17,7 @@ export interface PatternFormValues {
   yarn: string
   sourceUrl: string
   imageUrl: string
+  visibility: Visibility
   steps: StepValues[]
 }
 
@@ -29,6 +30,7 @@ export const emptyForm = (): PatternFormValues => ({
   yarn: '',
   sourceUrl: '',
   imageUrl: '',
+  visibility: 'PRIVATE',
   steps: [emptyStep()],
 })
 
@@ -40,6 +42,7 @@ export function toFormValues(pattern: Pattern): PatternFormValues {
     yarn: pattern.yarn ?? '',
     sourceUrl: pattern.sourceUrl ?? '',
     imageUrl: pattern.imageUrl ?? '',
+    visibility: pattern.visibility,
     steps: pattern.steps.map((step) => ({
       title: step.title,
       rows: step.rows.map((row) => ({ number: row.number, value: row.value })),
@@ -75,6 +78,8 @@ export function toPatternInput(values: PatternFormValues): PatternInput {
     yarn: optional(values.yarn),
     sourceUrl: optional(values.sourceUrl),
     imageUrl: optional(values.imageUrl),
+    // Toujours envoyée : omise, l'API repasserait le pattern en privé.
+    visibility: values.visibility,
     steps: values.steps.map((step) => ({
       title: step.title.trim(),
       rows: step.rows.map((row) => ({ number: row.number.trim(), value: row.value.trim() })),

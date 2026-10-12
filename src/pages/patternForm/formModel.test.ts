@@ -17,6 +17,7 @@ describe('formModel', () => {
       yarn: null,
       sourceUrl: null,
       imageUrl: null,
+      visibility: 'PRIVATE',
       steps: [{ title: 'Tête', rows: [{ number: '1', value: '6ms' }] }],
     })
   })
@@ -27,7 +28,7 @@ describe('formModel', () => {
       createdAt: '', updatedAt: '', progress: null, visibility: 'PUBLIC', author: { username: 'ana' }, mine: true,
       steps: [{ title: 'Tête', rows: [{ number: '1', value: '6ms' }] }],
     } satisfies Pattern
-    expect(toFormValues(pattern)).toMatchObject({ description: '', hookSizeMm: '3,5', yarn: 'Coton', sourceUrl: '' })
+    expect(toFormValues(pattern)).toMatchObject({ description: '', hookSizeMm: '3,5', yarn: 'Coton', sourceUrl: '', visibility: 'PUBLIC' })
   })
 
   it('parse et valide la taille du crochet', () => {

@@ -28,6 +28,7 @@ export function PatternForm({ pattern }: { pattern?: Pattern }) {
   const [banner, setBanner] = useState<string | null>(null)
   const [draft, setDraft] = useState(() => readDraft(pattern?.id))
   const saved = useRef(false)
+  const [confirmPrivate, setConfirmPrivate] = useState<PatternFormValues | null>(null)
 
   const restoreDraft = () => {
     if (!draft) return
@@ -55,21 +56,30 @@ export function PatternForm({ pattern }: { pattern?: Pattern }) {
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [isDirty])
 
+  const persist = async (values: PatternFormValues) => {
+    setBanner(null)
+    try {
+      const result = await save.mutateAsync(toPatternInput(values))
+      saved.current = true
+      clearDraft(pattern?.id)
+      // Ouvert depuis le détail : on y revient sans empiler une seconde entrée d'historique.
+      if (pattern && (location.state as { fromDetail?: boolean } | null)?.fromDetail) navigate(-1)
+      else navigate(`/patterns/${result.id}`, { replace: true })
+    } catch (error) {
+      // Session expirée : la redirection vers le login va suivre, on garde la saisie.
+      if (error instanceof ApiError && error.status === 401) saveDraft(pattern?.id, values)
+      setBanner(applyServerErrors(error, form))
+    }
+  }
+
   const onSubmit = handleSubmit(
     async (values) => {
-      setBanner(null)
-      try {
-        const result = await save.mutateAsync(toPatternInput(values))
-        saved.current = true
-        clearDraft(pattern?.id)
-        // Ouvert depuis le détail : on y revient sans empiler une seconde entrée d'historique.
-        if (pattern && (location.state as { fromDetail?: boolean } | null)?.fromDetail) navigate(-1)
-        else navigate(`/patterns/${result.id}`, { replace: true })
-      } catch (error) {
-        // Session expirée : la redirection vers le login va suivre, on garde la saisie.
-        if (error instanceof ApiError && error.status === 401) saveDraft(pattern?.id, values)
-        setBanner(applyServerErrors(error, form))
+      // Public → privé coupe l'accès des autres comptes : on confirme d'abord.
+      if (pattern?.visibility === 'PUBLIC' && values.visibility === 'PRIVATE') {
+        setConfirmPrivate(values)
+        return
       }
+      await persist(values)
     },
     () => scheduleFocusFirstError(form),
   )
@@ -135,6 +145,17 @@ export function PatternForm({ pattern }: { pattern?: Pattern }) {
           />
           {isHttpUrl(imageUrl) && <img src={imageUrl} alt="Aperçu" className="size-11 rounded-xl object-cover" />}
         </div>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 text-sm font-medium text-stone-700">Visibilité</legend>
+          <label className="flex min-h-11 items-center gap-3 rounded-xl bg-white px-3 py-2 ring-1 ring-stone-300 has-checked:ring-2 has-checked:ring-rose-500">
+            <input type="radio" value="PRIVATE" className="size-5 accent-rose-600" {...register('visibility')} />
+            Privé — visible par moi seul
+          </label>
+          <label className="flex min-h-11 items-center gap-3 rounded-xl bg-white px-3 py-2 ring-1 ring-stone-300 has-checked:ring-2 has-checked:ring-rose-500">
+            <input type="radio" value="PUBLIC" className="size-5 accent-rose-600" {...register('visibility')} />
+            Public — lisible par tous les comptes connectés
+          </label>
+        </fieldset>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -171,6 +192,20 @@ export function PatternForm({ pattern }: { pattern?: Pattern }) {
         danger
         onConfirm={() => blocker.proceed?.()}
         onCancel={() => blocker.reset?.()}
+      />
+      <ConfirmDialog
+        open={confirmPrivate !== null}
+        title="Rendre ce pattern privé ?"
+        message="Les autres comptes perdront l’accès à ce pattern et leur avancement."
+        confirmLabel="Rendre privé"
+        danger
+        loading={save.isPending}
+        onCancel={() => setConfirmPrivate(null)}
+        onConfirm={() => {
+          const values = confirmPrivate
+          setConfirmPrivate(null)
+          if (values) void persist(values)
+        }}
       />
     </form>
   )
