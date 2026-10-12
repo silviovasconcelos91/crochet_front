@@ -52,7 +52,10 @@ export function LoginPage() {
           autoCorrect="off"
           spellCheck={false}
           error={errors.username?.message}
-          {...register('username', { validate: requiredText })}
+          {...register('username', {
+            // Un pseudo ne contient jamais « @ » : inutile d'user une tentative (limitée) côté serveur.
+            validate: (value) => (value.includes('@') ? 'Connecte-toi avec ton pseudo, pas ton email' : requiredText(value)),
+          })}
         />
         <TextField
           label="Mot de passe"

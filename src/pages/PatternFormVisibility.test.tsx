@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { http } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { db, progressAt, seedAccount, seedPattern, seedProgress } from '../test/db'
@@ -68,6 +68,32 @@ describe('visibilité', () => {
     expect(await screen.findByRole('heading', { name: 'Lapin' })).toBeInTheDocument()
     expect(db.patterns[0].visibility).toBe('PRIVATE')
     expect(db.patterns[0].otherProgress).toEqual({})
+  })
+
+  it('garde la confirmation ouverte, avec chargement, pendant l’enregistrement en privé', async () => {
+    const ana = seedAccount()
+    const lapin = seedPattern(ana.id, { visibility: 'PUBLIC' })
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let puts = 0
+    server.use(
+      http.put(apiUrl(`/api/patterns/${lapin.id}`), async () => {
+        puts += 1
+        await gate
+      }),
+    )
+    const { user } = renderApp(`/patterns/${lapin.id}/edit`)
+    await user.click(await screen.findByRole('radio', { name: /^Privé/ }))
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    await user.click(screen.getByRole('button', { name: 'Rendre privé' }))
+
+    const dialog = screen.getByRole('alertdialog', { name: 'Rendre ce pattern privé ?' })
+    expect(within(dialog).getByRole('button', { name: /Rendre privé/ })).toBeDisabled()
+    release()
+    expect(await screen.findByRole('heading', { name: 'Lapin' })).toBeInTheDocument()
+    expect(puts).toBe(1)
   })
 
   it('refuse d’ouvrir le formulaire sur le pattern d’un autre', async () => {

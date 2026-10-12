@@ -178,7 +178,7 @@ export function PatternForm({ pattern }: { pattern?: Pattern }) {
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
         <div className="mx-auto max-w-2xl">
-          <Button type="submit" className="h-14 w-full text-lg" loading={isSubmitting}>
+          <Button type="submit" className="h-14 w-full text-lg" loading={isSubmitting || save.isPending}>
             Enregistrer
           </Button>
         </div>
@@ -201,10 +201,11 @@ export function PatternForm({ pattern }: { pattern?: Pattern }) {
         danger
         loading={save.isPending}
         onCancel={() => setConfirmPrivate(null)}
-        onConfirm={() => {
-          const values = confirmPrivate
+        onConfirm={async () => {
+          // Le dialogue reste ouvert (bouton en chargement) jusqu'à la réponse : pas de second envoi.
+          if (!confirmPrivate || save.isPending) return
+          await persist(confirmPrivate)
           setConfirmPrivate(null)
-          if (values) void persist(values)
         }}
       />
     </form>

@@ -38,6 +38,21 @@ describe('LoginPage', () => {
     expect(screen.getByRole('heading', { name: 'Connexion' })).toBeInTheDocument()
   })
 
+  it('explique, sans appeler l’API, qu’il faut le pseudo et non l’email', async () => {
+    seedAccount({ loggedIn: false })
+    let logins = 0
+    server.use(
+      http.post(apiUrl('/api/auth/login'), () => {
+        logins += 1
+      }),
+    )
+    const { user } = renderApp('/login')
+    await logIn(user, 'ana@example.com', 'secret123')
+    expect(await screen.findByText('Connecte-toi avec ton pseudo, pas ton email')).toBeInTheDocument()
+    expect(screen.getByLabelText('Pseudo')).toHaveAttribute('aria-invalid', 'true')
+    expect(logins).toBe(0)
+  })
+
   it('n’a plus de champ email', async () => {
     renderApp('/login')
     await screen.findByLabelText('Pseudo')
