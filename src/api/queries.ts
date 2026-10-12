@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router'
 import { changePassword, deleteAccount, fetchCsrf, getMe, login, logout, register } from './auth'
 import { isNotStarted } from '../lib/errors'
 import { optimisticProgress } from '../lib/progress'
@@ -147,14 +148,23 @@ export function useSavePattern(patternId?: number) {
   })
 }
 
-function clearSession(queryClient: ReturnType<typeof useQueryClient>) {
-  queryClient.removeQueries({ queryKey: queryKeys.patterns })
-  queryClient.setQueryData(queryKeys.me, null)
+/**
+ * Fin de session volontaire : purge du cache puis /login sans `redirect`, dans le même tick
+ * que la mise à `null` de `me` (sinon RequireAuth enverrait vers /login?redirect=<page courante>).
+ */
+function useEndSession() {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  return () => {
+    queryClient.removeQueries({ queryKey: queryKeys.patterns })
+    queryClient.setQueryData(queryKeys.me, null)
+    void navigate('/login', { replace: true })
+  }
 }
 
 export function useLogout() {
-  const queryClient = useQueryClient()
-  return useMutation({ mutationFn: logout, onSuccess: () => clearSession(queryClient) })
+  const endSession = useEndSession()
+  return useMutation({ mutationFn: logout, onSuccess: endSession })
 }
 
 export function useChangePassword() {
@@ -162,6 +172,6 @@ export function useChangePassword() {
 }
 
 export function useDeleteAccount() {
-  const queryClient = useQueryClient()
-  return useMutation({ mutationFn: deleteAccount, onSuccess: () => clearSession(queryClient) })
+  const endSession = useEndSession()
+  return useMutation({ mutationFn: deleteAccount, onSuccess: endSession })
 }

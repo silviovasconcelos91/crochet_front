@@ -47,10 +47,11 @@ describe('AccountPage', () => {
 
   it('déconnecte et renvoie au login', async () => {
     seedAccount()
-    const { user } = renderApp('/account')
+    const { user, router } = renderApp('/account')
     await user.click(await screen.findByRole('button', { name: 'Se déconnecter' }))
     expect(await screen.findByRole('heading', { name: 'Connexion' })).toBeInTheDocument()
     expect(db.sessionAccountId).toBeNull()
+    await waitFor(() => expect(router.state.location.search).toBe(''))
   })
 
   it('refuse la suppression avec un mauvais mot de passe', async () => {
@@ -66,12 +67,13 @@ describe('AccountPage', () => {
   it('supprime le compte après confirmation', async () => {
     const account = seedAccount()
     seedPattern(account.id)
-    const { user } = renderApp('/account')
+    const { user, router } = renderApp('/account')
     await user.type(await screen.findByLabelText('Mot de passe'), 'secret123')
     await user.click(screen.getByRole('button', { name: 'Supprimer mon compte' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Supprimer ton compte ?' })
     await user.click(within(dialog).getByRole('button', { name: 'Supprimer définitivement' }))
     expect(await screen.findByRole('heading', { name: 'Connexion' })).toBeInTheDocument()
+    await waitFor(() => expect(router.state.location.search).toBe(''))
     expect(db.accounts).toHaveLength(0)
     expect(db.patterns).toHaveLength(0)
   })

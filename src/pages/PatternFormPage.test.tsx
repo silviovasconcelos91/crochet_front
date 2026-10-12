@@ -107,9 +107,49 @@ describe('création', () => {
     expect(await screen.findByRole('heading', { name: 'Connexion' })).toBeInTheDocument()
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
   })
+
+  it('propose de restaurer la saisie perdue sur une session expirée', async () => {
+    seedAccount()
+    server.use(http.post(apiUrl('/api/patterns'), () => problem(401, 'Authentication required')))
+    const { user } = renderApp('/patterns/new')
+    await fillMinimal(user)
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    await user.type(await screen.findByLabelText('Email'), 'ana@example.com')
+    await user.type(screen.getByLabelText('Mot de passe'), 'secret123')
+    await user.click(screen.getByRole('button', { name: 'Se connecter' }))
+
+    await user.click(await screen.findByRole('button', { name: 'Restaurer' }))
+    expect(screen.getByLabelText('Titre *')).toHaveValue('Lapin')
+    expect(screen.getByLabelText('Instructions du rang 1 de l’étape 1')).toHaveValue('6ms (6)')
+    expect(screen.queryByRole('button', { name: 'Restaurer' })).not.toBeInTheDocument()
+  })
+
+  it('peut ignorer le brouillon retrouvé', async () => {
+    seedAccount()
+    sessionStorage.setItem('crochet.draft:new', JSON.stringify({ title: 'Ancien', steps: [] }))
+    const { user } = renderApp('/patterns/new')
+    await user.click(await screen.findByRole('button', { name: 'Ignorer' }))
+    expect(screen.getByLabelText('Titre *')).toHaveValue('')
+    expect(sessionStorage.getItem('crochet.draft:new')).toBeNull()
+  })
 })
 
 describe('édition', () => {
+  it('revient au détail sans doublon d’historique après enregistrement', async () => {
+    const account = seedAccount()
+    const pattern = seedPattern(account.id)
+    const { user, router } = renderApp(`/patterns/${pattern.id}`)
+    await user.click(await screen.findByRole('button', { name: 'Actions du pattern' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Modifier' }))
+    const title = await screen.findByLabelText('Titre *')
+    await user.clear(title)
+    await user.type(title, 'Lapin rose')
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    expect(await screen.findByRole('heading', { name: 'Lapin rose' })).toBeInTheDocument()
+    expect(router.state.historyAction).toBe('POP')
+    expect(router.state.location.pathname).toBe(`/patterns/${pattern.id}`)
+  })
+
   it('pré-remplit, modifie et enregistre le pattern complet', async () => {
     const account = seedAccount()
     const pattern = seedPattern(account.id, { hookSizeMm: 3.5, progress: progressAt(0, 1) })
@@ -139,6 +179,8 @@ describe('édition', () => {
     await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
     await screen.findByRole('heading', { name: 'Lapin' })
     expect(db.patterns[0].steps.map((step) => step.title)).toEqual(['Corps', 'Tête'])
+    expect(db.patterns[0].steps[0].rows).toEqual([{ number: '1', value: '12ms (12)' }])
+    expect(db.patterns[0].steps[1].rows.map((row) => row.value)).toEqual(['6ms dans cercle (6)', '6aug (12)'])
   })
 
   it('affiche « Pattern introuvable » pour un pattern inexistant', async () => {

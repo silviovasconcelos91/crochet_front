@@ -23,5 +23,6 @@ afterEach(() => {
   resetDb()
   clearCookies()
   localStorage.clear()
+  sessionStorage.clear()
 })
 afterAll(() => server.close())

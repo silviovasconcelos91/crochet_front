@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
-import { Link, useBlocker, useNavigate } from 'react-router'
+import { Link, useBlocker, useLocation, useNavigate } from 'react-router'
+import { ApiError } from '../../api/client'
 import { useSavePattern } from '../../api/queries'
 import type { Pattern } from '../../api/types'
 import { Button } from '../../components/Button'
@@ -12,20 +13,34 @@ import { applyServerErrors, scheduleFocusFirstError } from '../../lib/formErrors
 import { isHttpUrl } from '../../lib/url'
 import { maxChars, requiredText } from '../../lib/validation'
 import { emptyForm, emptyStep, toFormValues, toPatternInput, validateHookSize, type PatternFormValues } from './formModel'
+import { clearDraft, readDraft, saveDraft } from './draft'
 import { StepFields } from './StepFields'
 
 export function PatternForm({ pattern }: { pattern?: Pattern }) {
-  const form = useForm<PatternFormValues>({
-    defaultValues: pattern ? toFormValues(pattern) : emptyForm(),
-    shouldFocusError: false,
-  })
+  const defaults = pattern ? toFormValues(pattern) : emptyForm()
+  const form = useForm<PatternFormValues>({ defaultValues: defaults, shouldFocusError: false })
   const { register, control, handleSubmit, formState: { errors, isDirty, isSubmitting } } = form
   const steps = useFieldArray({ control, name: 'steps' })
   const imageUrl = useWatch({ control, name: 'imageUrl' })
   const save = useSavePattern(pattern?.id)
   const navigate = useNavigate()
+  const location = useLocation()
   const [banner, setBanner] = useState<string | null>(null)
+  const [draft, setDraft] = useState(() => readDraft(pattern?.id))
   const saved = useRef(false)
+
+  const restoreDraft = () => {
+    if (!draft) return
+    const steps = draft.steps?.length ? draft.steps : defaults.steps
+    form.reset({ ...defaults, ...draft, steps }, { keepDefaultValues: true })
+    clearDraft(pattern?.id)
+    setDraft(null)
+  }
+
+  const dismissDraft = () => {
+    clearDraft(pattern?.id)
+    setDraft(null)
+  }
 
   // Pas de blocage après succès, ni vers /login (session expirée : la redirection doit passer).
   const blocker = useBlocker(
@@ -46,8 +61,13 @@ export function PatternForm({ pattern }: { pattern?: Pattern }) {
       try {
         const result = await save.mutateAsync(toPatternInput(values))
         saved.current = true
-        navigate(`/patterns/${result.id}`, { replace: true })
+        clearDraft(pattern?.id)
+        // Ouvert depuis le détail : on y revient sans empiler une seconde entrée d'historique.
+        if (pattern && (location.state as { fromDetail?: boolean } | null)?.fromDetail) navigate(-1)
+        else navigate(`/patterns/${result.id}`, { replace: true })
       } catch (error) {
+        // Session expirée : la redirection vers le login va suivre, on garde la saisie.
+        if (error instanceof ApiError && error.status === 401) saveDraft(pattern?.id, values)
         setBanner(applyServerErrors(error, form))
       }
     },
@@ -70,6 +90,19 @@ export function PatternForm({ pattern }: { pattern?: Pattern }) {
           tone="info"
           message="Si tu supprimes le rang en cours, l’avancement sera recalé sur le dernier rang existant."
         />
+      )}
+      {draft && (
+        <div role="status" className="flex flex-col gap-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+          <p>Une saisie non enregistrée (session expirée) a été retrouvée.</p>
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={restoreDraft}>
+              Restaurer
+            </Button>
+            <Button variant="secondary" className="flex-1" onClick={dismissDraft}>
+              Ignorer
+            </Button>
+          </div>
+        </div>
       )}
       <FormBanner message={banner} />
 
