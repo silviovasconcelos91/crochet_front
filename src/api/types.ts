@@ -2,6 +2,7 @@ export type ProgressStatus = 'IN_PROGRESS' | 'FINISHED'
 
 export interface Account {
   id: number
+  username: string
   email: string
   createdAt: string
 }

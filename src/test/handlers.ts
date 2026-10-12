@@ -31,7 +31,11 @@ const csrfOk = (request: Request) =>
 
 const sessionAccount = () => db.accounts.find((account) => account.id === db.sessionAccountId)
 
-const publicAccount = ({ id, email, createdAt }: DbAccount) => ({ id, email, createdAt })
+const USERNAME = /^[\p{L}\p{N}_.-]{3,30}$/u
+const USERNAME_MESSAGE = "must be 3 to 30 letters, digits, '_', '-' or '.'"
+const sameUsername = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
+
+const publicAccount = ({ id, username, email, createdAt }: DbAccount) => ({ id, username, email, createdAt })
 
 function publicPattern(pattern: DbPattern): Pattern {
   const { ownerId: _ownerId, ...rest } = pattern
@@ -109,15 +113,20 @@ export const handlers = [
   http.post(
     apiUrl('/api/auth/register'),
     csrfOnly(async (request) => {
-      const body = (await request.json()) as { email?: string; password?: string }
+      const body = (await request.json()) as { username?: string; email?: string; password?: string }
+      const username = (body.username ?? '').trim()
       const email = (body.email ?? '').trim().toLowerCase()
       const password = body.password ?? ''
       const errors: ApiFieldError[] = []
+      if (!USERNAME.test(username)) errors.push({ field: 'username', message: USERNAME_MESSAGE })
       if (!email.includes('@')) errors.push({ field: 'email', message: 'must be a well-formed email address' })
       if (password.length < 8) errors.push({ field: 'password', message: 'size must be between 8 and 72' })
       if (errors.length > 0) return validation(errors)
-      if (db.accounts.some((account) => account.email === email)) return problem(409, 'Email already used')
-      const account: DbAccount = { id: db.nextId++, email, password, createdAt: new Date().toISOString() }
+      const taken: ApiFieldError[] = []
+      if (db.accounts.some((a) => sameUsername(a.username, username))) taken.push({ field: 'username', message: 'is already used' })
+      if (db.accounts.some((a) => a.email === email)) taken.push({ field: 'email', message: 'is already used' })
+      if (taken.length > 0) return problem(409, 'Already used', { errors: taken })
+      const account: DbAccount = { id: db.nextId++, username, email, password, createdAt: new Date().toISOString() }
       db.accounts.push(account)
       db.sessionAccountId = account.id
       issueCsrf()
@@ -128,10 +137,10 @@ export const handlers = [
   http.post(
     apiUrl('/api/auth/login'),
     csrfOnly(async (request) => {
-      const body = (await request.json()) as { email?: string; password?: string }
-      const email = (body.email ?? '').trim().toLowerCase()
-      const account = db.accounts.find((a) => a.email === email && a.password === body.password)
-      if (!account) return problem(401, 'Invalid email or password')
+      const body = (await request.json()) as { username?: string; password?: string }
+      const username = (body.username ?? '').trim()
+      const account = db.accounts.find((a) => sameUsername(a.username, username) && a.password === body.password)
+      if (!account) return problem(401, 'Invalid username or password')
       db.sessionAccountId = account.id
       issueCsrf()
       return HttpResponse.json(publicAccount(account))

@@ -1,25 +1,24 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useLocation } from 'react-router'
-import { ApiError } from '../api/client'
 import { useRegister } from '../api/queries'
 import { AuthShell } from '../components/AuthShell'
 import { Button } from '../components/Button'
 import { FormBanner } from '../components/FormBanner'
 import { TextField } from '../components/TextField'
-import { errorMessage } from '../lib/errors'
 import { applyServerErrors } from '../lib/formErrors'
-import { confirmRule, emailRules, newPasswordRules } from '../lib/validation'
+import { confirmRule, emailRules, newPasswordRules, USERNAME_HINT, usernameRules } from '../lib/validation'
 
 interface RegisterValues {
+  username: string
   email: string
   password: string
   confirm: string
 }
 
 export function RegisterPage() {
-  const form = useForm<RegisterValues>({ defaultValues: { email: '', password: '', confirm: '' } })
-  const { register, handleSubmit, getValues, setError, formState: { errors } } = form
+  const form = useForm<RegisterValues>({ defaultValues: { username: '', email: '', password: '', confirm: '' } })
+  const { register, handleSubmit, getValues, formState: { errors } } = form
   const registerMutation = useRegister()
   const location = useLocation()
   const [banner, setBanner] = useState<string | null>(null)
@@ -27,13 +26,14 @@ export function RegisterPage() {
   const onSubmit = handleSubmit(async (values) => {
     setBanner(null)
     try {
-      await registerMutation.mutateAsync({ email: values.email.trim(), password: values.password })
+      await registerMutation.mutateAsync({
+        username: values.username.trim(),
+        email: values.email.trim(),
+        password: values.password,
+      })
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
-        setError('email', { type: 'server', message: errorMessage(error) }, { shouldFocus: true })
-      } else {
-        setBanner(applyServerErrors(error, form))
-      }
+      // 409 : le serveur nomme le champ pris (pseudo et/ou email), mappé sous le bon champ.
+      setBanner(applyServerErrors(error, form))
     }
   })
 
@@ -51,6 +51,16 @@ export function RegisterPage() {
     >
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         <FormBanner message={banner} />
+        <TextField
+          label="Pseudo"
+          autoComplete="username"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          hint={USERNAME_HINT}
+          error={errors.username?.message}
+          {...register('username', usernameRules)}
+        />
         <TextField
           label="Email"
           type="email"

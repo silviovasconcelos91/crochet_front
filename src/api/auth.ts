@@ -1,7 +1,13 @@
 import { api, ApiError } from './client'
 import type { Account } from './types'
 
-export interface Credentials {
+export interface LoginCredentials {
+  username: string
+  password: string
+}
+
+export interface Registration {
+  username: string
   email: string
   password: string
 }
@@ -17,10 +23,11 @@ export async function getMe(): Promise<Account | null> {
   }
 }
 
-export const register = (credentials: Credentials) =>
-  api<Account>('/api/auth/register', { method: 'POST', body: credentials })
+export const register = (registration: Registration) =>
+  api<Account>('/api/auth/register', { method: 'POST', body: registration })
 
-export const login = (credentials: Credentials) => api<Account>('/api/auth/login', { method: 'POST', body: credentials })
+export const login = (credentials: LoginCredentials) =>
+  api<Account>('/api/auth/login', { method: 'POST', body: credentials })
 
 export const logout = () => api<void>('/api/auth/logout', { method: 'POST' })
 

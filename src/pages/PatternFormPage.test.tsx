@@ -114,7 +114,7 @@ describe('création', () => {
     const { user } = renderApp('/patterns/new')
     await fillMinimal(user)
     await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
-    await user.type(await screen.findByLabelText('Email'), 'ana@example.com')
+    await user.type(await screen.findByLabelText('Pseudo'), 'ana')
     await user.type(screen.getByLabelText('Mot de passe'), 'secret123')
     await user.click(screen.getByRole('button', { name: 'Se connecter' }))
 

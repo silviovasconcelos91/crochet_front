@@ -10,12 +10,12 @@ import { applyServerErrors } from '../lib/formErrors'
 import { requiredText } from '../lib/validation'
 
 interface LoginValues {
-  email: string
+  username: string
   password: string
 }
 
 export function LoginPage() {
-  const form = useForm<LoginValues>({ defaultValues: { email: '', password: '' } })
+  const form = useForm<LoginValues>({ defaultValues: { username: '', password: '' } })
   const { register, handleSubmit, formState: { errors } } = form
   const loginMutation = useLogin()
   const location = useLocation()
@@ -25,7 +25,7 @@ export function LoginPage() {
     setBanner(null)
     try {
       // Succès : `me` est écrit dans le cache, GuestOnly redirige.
-      await loginMutation.mutateAsync({ email: values.email.trim(), password: values.password })
+      await loginMutation.mutateAsync({ username: values.username.trim(), password: values.password })
     } catch (error) {
       setBanner(applyServerErrors(error, form))
     }
@@ -46,12 +46,13 @@ export function LoginPage() {
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         <FormBanner message={banner} />
         <TextField
-          label="Email"
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          error={errors.email?.message}
-          {...register('email', { validate: requiredText })}
+          label="Pseudo"
+          autoComplete="username"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          error={errors.username?.message}
+          {...register('username', { validate: requiredText })}
         />
         <TextField
           label="Mot de passe"

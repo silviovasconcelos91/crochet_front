@@ -14,8 +14,8 @@ describe('auth', () => {
   })
 
   it('register connecte directement, et le token tourné sert à la requête suivante', async () => {
-    const account = await register({ email: 'Ana@Example.com ', password: 'secret123' })
-    expect(account.email).toBe('ana@example.com')
+    const account = await register({ username: 'Ana', email: 'Ana@Example.com ', password: 'secret123' })
+    expect(account).toMatchObject({ username: 'Ana', email: 'ana@example.com' })
     await expect(getMe()).resolves.toMatchObject({ email: 'ana@example.com' })
     await changePassword({ currentPassword: 'secret123', newPassword: 'secret456' })
     expect(db.accounts[0].password).toBe('secret456')
@@ -23,9 +23,15 @@ describe('auth', () => {
 
   it('login échoue en 401 avec de mauvais identifiants', async () => {
     seedAccount({ loggedIn: false })
-    const error = await login({ email: 'ana@example.com', password: 'wrong' }).catch((e: unknown) => e)
+    const error = await login({ username: 'ana', password: 'wrong' }).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(ApiError)
     expect(error).toMatchObject({ status: 401 })
+  })
+
+  it('refuse un pseudo déjà pris, sans tenir compte de la casse', async () => {
+    seedAccount({ loggedIn: false })
+    const error = await register({ username: 'ANA', email: 'autre@example.com', password: 'secret123' }).catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 409, fieldErrors: [{ field: 'username', message: 'is already used' }] })
   })
 
   it('logout ferme la session', async () => {

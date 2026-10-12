@@ -29,11 +29,12 @@ export function resetDb(): void {
 export const SEED_DATE = '2026-10-12T12:00:00Z'
 
 export function seedAccount({
+  username = 'ana',
   email = 'ana@example.com',
   password = 'secret123',
   loggedIn = true,
-}: { email?: string; password?: string; loggedIn?: boolean } = {}): DbAccount {
-  const account: DbAccount = { id: db.nextId++, email, password, createdAt: SEED_DATE }
+}: { username?: string; email?: string; password?: string; loggedIn?: boolean } = {}): DbAccount {
+  const account: DbAccount = { id: db.nextId++, username, email, password, createdAt: SEED_DATE }
   db.accounts.push(account)
   if (loggedIn) db.sessionAccountId = account.id
   return account
