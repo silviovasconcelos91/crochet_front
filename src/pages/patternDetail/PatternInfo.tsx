@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Pattern } from '../../api/types'
 import { StatusBadge } from '../../components/StatusBadge'
+import { VisibilityBadge } from '../../components/VisibilityBadge'
 import { formatHookSize } from '../../lib/format'
 import { isHttpUrl } from '../../lib/url'
 
@@ -12,6 +13,13 @@ export function PatternInfo({ pattern }: { pattern: Pattern }) {
     .join(' · ')
   return (
     <section className="flex flex-col gap-3">
+      {pattern.mine ? (
+        <div>
+          <VisibilityBadge visibility={pattern.visibility} />
+        </div>
+      ) : (
+        <p className="text-sm text-stone-500">par {pattern.author.username}</p>
+      )}
       {isHttpUrl(pattern.imageUrl) && pattern.imageUrl !== failedImage && (
         <img
           src={pattern.imageUrl}

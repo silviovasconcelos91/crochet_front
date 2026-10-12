@@ -86,7 +86,11 @@ export function PatternDetail({ pattern }: { pattern: Pattern }) {
       <ConfirmDialog
         open={confirm === 'delete'}
         title="Supprimer ce pattern ?"
-        message="Le pattern et son avancement seront définitivement supprimés."
+        message={
+          pattern.visibility === 'PUBLIC'
+            ? 'Le pattern, ton avancement et celui des autres comptes seront définitivement supprimés.'
+            : 'Le pattern et son avancement seront définitivement supprimés.'
+        }
         confirmLabel="Supprimer"
         danger
         loading={remove.isPending}
