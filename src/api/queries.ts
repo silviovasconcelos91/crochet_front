@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { changePassword, deleteAccount, fetchCsrf, getMe, login, logout, register } from './auth'
+import { changePassword, changeUsername, deleteAccount, fetchCsrf, getMe, login, logout, register } from './auth'
 import { isNotStarted } from '../lib/errors'
 import { optimisticProgress } from '../lib/progress'
 import {
@@ -18,6 +18,7 @@ import type { Pattern, PatternInput, PatternSummary, ProgressInput } from './typ
 export const queryKeys = {
   csrf: ['csrf'] as const,
   me: ['me'] as const,
+  sessionEnd: ['sessionEnd'] as const,
   patterns: ['patterns'] as const,
   publicPatterns: ['patterns', 'public'] as const,
   pattern: (id: number) => ['patterns', id] as const,
@@ -54,6 +55,7 @@ export function useLogin() {
     meta: { skipAuthRedirect: true },
     onSuccess: (account) => {
       queryClient.removeQueries({ queryKey: queryKeys.patterns })
+      queryClient.removeQueries({ queryKey: queryKeys.sessionEnd })
       queryClient.setQueryData(queryKeys.me, account)
     },
   })
@@ -65,6 +67,7 @@ export function useRegister() {
     mutationFn: register,
     onSuccess: (account) => {
       queryClient.removeQueries({ queryKey: queryKeys.patterns })
+      queryClient.removeQueries({ queryKey: queryKeys.sessionEnd })
       queryClient.setQueryData(queryKeys.me, account)
     },
   })
@@ -172,14 +175,16 @@ export function useSavePattern(patternId?: number) {
 }
 
 /**
- * Fin de session volontaire : purge du cache puis /login sans `redirect`, dans le même tick
- * que la mise à `null` de `me` (sinon RequireAuth enverrait vers /login?redirect=<page courante>).
+ * Fin de session volontaire (déconnexion, suppression du compte). Le marqueur `sessionEnd`
+ * dit à RequireAuth d'envoyer vers /login sans `redirect` : react-router applique ses
+ * navigations en transition, donc RequireAuth peut voir `me = null` avant que /login soit affiché.
  */
 function useEndSession() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   return () => {
     queryClient.removeQueries({ queryKey: queryKeys.patterns })
+    queryClient.setQueryData(queryKeys.sessionEnd, 'voluntary')
     queryClient.setQueryData(queryKeys.me, null)
     void navigate('/login', { replace: true })
   }
@@ -197,4 +202,12 @@ export function useChangePassword() {
 export function useDeleteAccount() {
   const endSession = useEndSession()
   return useMutation({ mutationFn: deleteAccount, onSuccess: endSession })
+}
+
+export function useChangeUsername() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: changeUsername,
+    onSuccess: (account) => queryClient.setQueryData(queryKeys.me, account),
+  })
 }

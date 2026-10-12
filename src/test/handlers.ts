@@ -209,6 +209,23 @@ export const handlers = [
     }),
   ),
 
+  http.put(
+    apiUrl('/api/me/username'),
+    authed(async ({ request, account }) => {
+      const body = (await request.json()) as { username?: string; currentPassword?: string }
+      const username = (body.username ?? '').trim()
+      if (!USERNAME.test(username)) return validation([{ field: 'username', message: USERNAME_MESSAGE }])
+      if (body.currentPassword !== account.password) {
+        return validation([{ field: 'currentPassword', message: 'is incorrect' }])
+      }
+      if (db.accounts.some((a) => a.id !== account.id && sameUsername(a.username, username))) {
+        return problem(409, 'Already used', { errors: [{ field: 'username', message: 'is already used' }] })
+      }
+      account.username = username
+      return HttpResponse.json(publicAccount(account))
+    }),
+  ),
+
   http.delete(
     apiUrl('/api/me'),
     authed(async ({ request, account }) => {

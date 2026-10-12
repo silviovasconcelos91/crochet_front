@@ -35,3 +35,6 @@ export const changePassword = (body: { currentPassword: string; newPassword: str
   api<void>('/api/me/password', { method: 'PUT', body })
 
 export const deleteAccount = (password: string) => api<void>('/api/me', { method: 'DELETE', body: { password } })
+
+export const changeUsername = (body: { username: string; currentPassword: string }) =>
+  api<Account>('/api/me/username', { method: 'PUT', body })

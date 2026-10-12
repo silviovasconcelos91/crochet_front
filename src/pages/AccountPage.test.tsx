@@ -54,6 +54,17 @@ describe('AccountPage', () => {
     await waitFor(() => expect(router.state.location.search).toBe(''))
   })
 
+  it('permet de se reconnecter juste après la déconnexion', async () => {
+    seedAccount()
+    const { user, router } = renderApp('/account')
+    await user.click(await screen.findByRole('button', { name: 'Se déconnecter' }))
+    await user.type(await screen.findByLabelText('Pseudo'), 'ana')
+    await user.type(screen.getByLabelText('Mot de passe'), 'secret123')
+    await user.click(screen.getByRole('button', { name: 'Se connecter' }))
+    expect(await screen.findByRole('heading', { name: 'Mes patterns' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/')
+  })
+
   it('refuse la suppression avec un mauvais mot de passe', async () => {
     seedAccount()
     const { user } = renderApp('/account')

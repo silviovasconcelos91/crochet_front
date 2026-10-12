@@ -4,6 +4,7 @@ import { useToast } from '../components/toast/useToast'
 import { errorMessage } from '../lib/errors'
 import { formatDate } from '../lib/format'
 import { ChangePasswordForm } from './account/ChangePasswordForm'
+import { ChangeUsernameForm } from './account/ChangeUsernameForm'
 import { DeleteAccountForm } from './account/DeleteAccountForm'
 
 export function AccountPage() {
@@ -16,10 +17,12 @@ export function AccountPage() {
       <h1 className="text-2xl font-semibold">Mon compte</h1>
       {me && (
         <section className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
-          <p className="font-medium">{me.email}</p>
+          <p className="text-lg font-semibold">@{me.username}</p>
+          <p className="text-stone-700">{me.email}</p>
           <p className="text-sm text-stone-500">Inscrit le {formatDate(me.createdAt)}</p>
         </section>
       )}
+      <ChangeUsernameForm />
       <ChangePasswordForm />
       <Button
         variant="secondary"
