@@ -10,7 +10,9 @@ cp .env.example .env.local   # VITE_API_URL, par défaut http://localhost:8080
 npm run dev                  # http://localhost:5173 (origine autorisée par le CORS du backend)
 ```
 
-Le backend doit tourner sur `http://localhost:8080`. En production, le front doit partager le domaine parent de l'API (cookie de session `SameSite=Lax`).
+Le backend doit tourner sur `http://localhost:8080`.
+
+En production (Vercel), le front appelle l'API en relatif (`.env.production` : `VITE_API_URL=` vide) et `vercel.json` proxifie `/api/*` vers le backend Railway. Tout reste same-origin : le cookie de session `SameSite=Lax` est envoyé et le cookie `XSRF-TOKEN` reste lisible par le front.
 
 ## Scripts
 
